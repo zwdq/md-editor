@@ -479,7 +479,8 @@ async function saveDoc() {
 async function saveDocSilent() {
   if (!currentDocId) return;
   const text = lines.map(l => l.text).join("\n");
-  await api("PUT", "/docs/" + currentDocId, { content: text });
+  const title = lines.find(l => /^#\s/.test(l.text.trim()))?.text?.replace(/^#\s+/, "")?.trim() || text.split("\n")[0]?.slice(0, 50) || "无标题";
+  await api("PUT", "/docs/" + currentDocId, { content: text, title });
 }
 
 async function delDoc(id) {
@@ -646,22 +647,23 @@ function createLineEl(i) {
   div.spellcheck = false;
   div.innerHTML = lines[i].html || "";
 
-  // focus: 显示源码
+  // focus: 显示源码（从 dataset 动态读索引，不用闭包）
   div.addEventListener("focus", function() {
-    onLineFocus(i);
+    onLineFocus(parseInt(this.dataset.index));
   });
 
   // input: 实时保存源码到内存
   div.addEventListener("input", function() {
-    if (div.classList.contains("editing")) {
-      lines[i].text = div.textContent;
+    if (this.classList.contains("editing")) {
+      lines[parseInt(this.dataset.index)].text = this.textContent;
     }
   });
 
   // blur: 兜底渲染
   div.addEventListener("blur", function() {
-    if (activeLine === i) {
-      commitLine(i);
+    const idx = parseInt(this.dataset.index);
+    if (activeLine === idx) {
+      commitLine(idx);
       activeLine = -1;
       saveContent();
     }
