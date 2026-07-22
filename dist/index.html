@@ -585,10 +585,10 @@ function toggleTheme() {
 function renderLine(text, inCodeBlock) {
   // 代码块内：原样显示
   if (inCodeBlock) {
-    return text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;") || "<br>";
+    return text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;") || "&#8203;";
   }
   let html = text;
-  if (!html.trim()) return "<br>";
+  if (!html.trim()) return "";
   html = html.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   // 行内代码先提取
   const codes = [];
@@ -660,7 +660,7 @@ function createLineEl(i) {
   div.dataset.inCode = lines[i].inCode ? "1" : "0";
   div.contentEditable = "true";
   div.spellcheck = false;
-  div.innerHTML = lines[i].html || "<br>";
+  div.innerHTML = lines[i].html || "&#8203;";
 
   // focus: 显示源码（从 dataset 动态读索引，不用闭包）
   div.addEventListener("focus", function() {
@@ -670,7 +670,7 @@ function createLineEl(i) {
   // input: 实时保存源码到内存
   div.addEventListener("input", function() {
     if (this.classList.contains("editing")) {
-      lines[parseInt(this.dataset.index)].text = this.textContent;
+      lines[parseInt(this.dataset.index)].text = this.textContent.replace(/\u200B/g, "");
     }
   });
 
@@ -725,8 +725,12 @@ function onLineFocus(i) {
   const div = editor.children[i];
   if (!div) return;
   div.classList.add("editing");
-  // 显示源码，空行也给个占位
+  // 显示源码（清除零宽空格等占位符）
   div.textContent = lines[i].text || "";
+  // 如果空行，确保有内容可编辑
+  if (!div.firstChild) {
+    div.innerHTML = "&#8203;";
+  }
   // 光标放末尾
   const sel = window.getSelection();
   const range = document.createRange();
@@ -750,7 +754,7 @@ function commitLine(i) {
   recomputeAllCodeBlocks();
   div.classList.remove("editing");
   div.classList.toggle("empty", lines[i].text.trim() === "");
-  div.innerHTML = lines[i].html || "<br>";
+  div.innerHTML = lines[i].html || "&#8203;";
   // 更新所有行的 className 和 innerHTML（代码块状态可能变了）
   for (let j = 0; j < editor.children.length; j++) {
     const d = editor.children[j];
@@ -758,7 +762,7 @@ function commitLine(i) {
     const wasEditing = d.classList.contains("editing");
     if (wasEditing) continue;
     d.className = "line" + (lines[j].text.trim() === "" ? " empty" : "") + (lines[j].inCode ? " code-line" : "");
-    d.innerHTML = lines[j].html || "<br>";
+    d.innerHTML = lines[j].html || "&#8203;";
   }
 }
 
@@ -824,11 +828,11 @@ editor.addEventListener("keydown", (e) => {
     // 更新当前行 DOM
     target.classList.remove("editing");
     target.className = "line" + (before.trim() === "" ? " empty" : "") + (lines[i].inCode ? " code-line" : "");
-    target.innerHTML = lines[i].html || "<br>";
+    target.innerHTML = lines[i].html || "&#8203;";
     // 更新后续行 DOM
     for (let j = i + 1; j < editor.children.length; j++) {
       editor.children[j].className = "line" + (lines[j].text.trim() === "" ? " empty" : "") + (lines[j].inCode ? " code-line" : "");
-      editor.children[j].innerHTML = lines[j].html || "<br>";
+      editor.children[j].innerHTML = lines[j].html || "&#8203;";
     }
     // 创建新行 DOM
     const newDiv = createLineEl(i + 1);
@@ -836,7 +840,7 @@ editor.addEventListener("keydown", (e) => {
     // 再次更新新行后面的行
     for (let j = i + 2; j < editor.children.length; j++) {
       editor.children[j].className = "line" + (lines[j].text.trim() === "" ? " empty" : "") + (lines[j].inCode ? " code-line" : "");
-      editor.children[j].innerHTML = lines[j].html || "<br>";
+      editor.children[j].innerHTML = lines[j].html || "&#8203;";
     }
     refreshIndices();
     newDiv.focus();
@@ -844,27 +848,33 @@ editor.addEventListener("keydown", (e) => {
     return;
   }
 
-  // 上方向键：渲染当前行，跳到上一行
-  if (e.key === "ArrowUp" && i > 0) {
+  // 上方向键：光标在行首时才跳到上一行
+  if (e.key === "ArrowUp") {
     const offset = getCaretOffset(target);
-    // 只在光标在第一行时才跳（简化：直接跳）
-    e.preventDefault();
-    commitLine(i);
-    activeLine = -1;
-    saveContent();
-    const prevDiv = editor.children[i - 1];
-    prevDiv.focus();
+    // 检查是否在第一行（多行内容时需要判断）
+    const text = lines[i].text;
+    const beforeCursor = text.slice(0, offset);
+    if (i > 0 && !beforeCursor.includes("\n") && offset === 0) {
+      e.preventDefault();
+      commitLine(i);
+      activeLine = -1;
+      saveContent();
+      editor.children[i - 1].focus();
+    }
     return;
   }
 
-  // 下方向键：渲染当前行，跳到下一行
-  if (e.key === "ArrowDown" && i < editor.children.length - 1) {
-    e.preventDefault();
-    commitLine(i);
-    activeLine = -1;
-    saveContent();
-    const nextDiv = editor.children[i + 1];
-    nextDiv.focus();
+  // 下方向键：光标在行尾时才跳到下一行
+  if (e.key === "ArrowDown") {
+    const offset = getCaretOffset(target);
+    const text = lines[i].text;
+    if (i < editor.children.length - 1 && offset >= text.length) {
+      e.preventDefault();
+      commitLine(i);
+      activeLine = -1;
+      saveContent();
+      editor.children[i + 1].focus();
+    }
     return;
   }
 
