@@ -30,7 +30,7 @@ header h1 { font-size: 15px; font-weight: 600; }
 .editor-area { max-width: 760px; margin: 0 auto; padding: 32px 32px 120px; outline: none; min-height: 100%; }
 .editor-area:focus { outline: none; }
 
-.line { position: relative; min-height: 1.8em; padding: 1px 8px; margin: 0 -8px; border-radius: 4px; transition: background .08s; font-size: 16px; line-height: 1.8; }
+.line { position: relative; min-height: 1.8em; padding: 1px 8px; margin: 0 -8px; border-radius: 4px; transition: background .08s; font-size: 16px; line-height: 1.8; caret-color: var(--accent); }
 .line:hover { background: var(--accent-soft); }
 .line:focus { outline: none; background: var(--bg-secondary); }
 .line.empty::before { content: ""; }
@@ -59,8 +59,9 @@ header h1 { font-size: 15px; font-weight: 600; }
 .line hr { border: 0; border-top: 1px solid var(--border); }
 .line .checkbox { list-style: none; margin-left: -1.2em; }
 .line .checkbox input { margin-right: 6px; }
-.line.editing { font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; font-size: 14px; white-space: pre-wrap; word-break: break-word; }
-.line.code-line { font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; font-size: 14px; color: var(--text); background: var(--code-bg); border-radius: 0; white-space: pre-wrap; word-break: break-word; }
+.line.editing { font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; font-size: 14px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; tab-size: 2; }
+.line.editing:empty::before { content: "\00a0"; }
+.line.code-line { min-height: 1.55em; font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; font-size: 14px; line-height: 1.55; color: var(--text); background: var(--code-bg); border-radius: 0; white-space: pre-wrap; word-break: break-word; tab-size: 2; }
 .line.code-line:first-of-type, .line.code-line:not(.code-line) + .code-line { } 
 .line .code-fence { display: inline-block; font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--accent); background: var(--accent-soft); padding: 2px 10px; border-radius: 4px; font-weight: 600; }
 .line.code-fence-row { background: var(--code-bg); border-radius: 8px 8px 0 0; padding-top: 8px; }
@@ -585,7 +586,7 @@ function toggleTheme() {
 function renderLine(text, inCodeBlock) {
   // 代码块内：原样显示
   if (inCodeBlock) {
-    return text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;") || "&#8203;";
+    return text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   }
   let html = text;
   if (!html.trim()) return "";
@@ -643,6 +644,11 @@ function isFenceLine(text) {
   return getFenceLang(text) !== null;
 }
 
+function isCodeNavLine(index) {
+  const line = lines[index];
+  return !!line && (line.inCode || isFenceLine(line.text));
+}
+
 // ── 初始化行（标记代码块）──
 function initLines(text) {
   lines = text.split("\n").map(t => ({ text: t, html: "", inCode: false }));
@@ -669,7 +675,13 @@ function createLineEl(i) {
   div.dataset.inCode = lines[i].inCode ? "1" : "0";
   div.contentEditable = "true";
   div.spellcheck = false;
-  div.innerHTML = lines[i].html || "&#8203;";
+  div.innerHTML = lines[i].html || "";
+
+  div.addEventListener("pointerdown", function(e) {
+    const idx = parseInt(this.dataset.index);
+    const offset = getPointCaretOffset(this, e.clientX, e.clientY);
+    if (offset !== null) pendingCaret = { index: idx, offset };
+  });
 
   // focus: 显示源码（从 dataset 动态读索引，不用闭包）
   div.addEventListener("focus", function() {
@@ -783,9 +795,6 @@ function onLineFocus(i, caretOffset = null) {
   // 显示源码（清除零宽空格等占位符）
   div.textContent = lines[i].text || "";
   // 如果空行，确保有内容可编辑
-  if (!div.firstChild) {
-    div.innerHTML = "&#8203;";
-  }
   if (caretOffset !== null && caretOffset !== undefined) {
     setCaretOffset(div, caretOffset);
     return;
@@ -802,7 +811,7 @@ function commitLine(i) {
   div.classList.remove("editing");
   div.classList.toggle("empty", lines[i].text.trim() === "");
   div.dataset.inCode = lines[i].inCode ? "1" : "0";
-  div.innerHTML = lines[i].html || "&#8203;";
+  div.innerHTML = lines[i].html || "";
   // 更新所有行的 className 和 innerHTML（代码块状态可能变了）
   for (let j = 0; j < editor.children.length; j++) {
     const d = editor.children[j];
@@ -811,7 +820,7 @@ function commitLine(i) {
     if (wasEditing) continue;
     d.className = "line" + (lines[j].text.trim() === "" ? " empty" : "") + (lines[j].inCode ? " code-line" : "");
     d.dataset.inCode = lines[j].inCode ? "1" : "0";
-    d.innerHTML = lines[j].html || "&#8203;";
+    d.innerHTML = lines[j].html || "";
   }
 }
 
@@ -877,12 +886,12 @@ editor.addEventListener("keydown", (e) => {
     // 更新当前行 DOM
     target.classList.remove("editing");
     target.className = "line" + (before.trim() === "" ? " empty" : "") + (lines[i].inCode ? " code-line" : "");
-    target.innerHTML = lines[i].html || "&#8203;";
+    target.innerHTML = lines[i].html || "";
     // 更新后续行 DOM
     for (let j = i + 1; j < editor.children.length; j++) {
       editor.children[j].className = "line" + (lines[j].text.trim() === "" ? " empty" : "") + (lines[j].inCode ? " code-line" : "");
       editor.children[j].dataset.inCode = lines[j].inCode ? "1" : "0";
-      editor.children[j].innerHTML = lines[j].html || "&#8203;";
+      editor.children[j].innerHTML = lines[j].html || "";
     }
     // 创建新行 DOM
     const newDiv = createLineEl(i + 1);
@@ -891,7 +900,7 @@ editor.addEventListener("keydown", (e) => {
     for (let j = i + 2; j < editor.children.length; j++) {
       editor.children[j].className = "line" + (lines[j].text.trim() === "" ? " empty" : "") + (lines[j].inCode ? " code-line" : "");
       editor.children[j].dataset.inCode = lines[j].inCode ? "1" : "0";
-      editor.children[j].innerHTML = lines[j].html || "&#8203;";
+      editor.children[j].innerHTML = lines[j].html || "";
     }
     refreshIndices();
     focusLine(i + 1, 0);
@@ -902,6 +911,15 @@ editor.addEventListener("keydown", (e) => {
   // 上方向键：光标在行首时才跳到上一行
   if (e.key === "ArrowUp") {
     const offset = getCaretOffset(target);
+    if (isCodeNavLine(i) && i > 0 && isCodeNavLine(i - 1)) {
+      e.preventDefault();
+      lines[i].text = target.textContent;
+      commitLine(i);
+      activeLine = -1;
+      saveContent();
+      focusLine(i - 1, Math.min(offset, lines[i - 1].text.length));
+      return;
+    }
     // 检查是否在第一行（多行内容时需要判断）
     const text = lines[i].text;
     const beforeCursor = text.slice(0, offset);
@@ -919,6 +937,15 @@ editor.addEventListener("keydown", (e) => {
   if (e.key === "ArrowDown") {
     const offset = getCaretOffset(target);
     const text = lines[i].text;
+    if (isCodeNavLine(i) && i < editor.children.length - 1 && isCodeNavLine(i + 1)) {
+      e.preventDefault();
+      lines[i].text = target.textContent;
+      commitLine(i);
+      activeLine = -1;
+      saveContent();
+      focusLine(i + 1, Math.min(offset, lines[i + 1].text.length));
+      return;
+    }
     if (i < editor.children.length - 1 && offset >= text.length) {
       e.preventDefault();
       commitLine(i);
@@ -969,6 +996,25 @@ function getCaretOffset(el) {
 }
 
 // 粘贴纯文本
+function getPointCaretOffset(el, x, y) {
+  let range = null;
+  if (document.caretPositionFromPoint) {
+    const pos = document.caretPositionFromPoint(x, y);
+    if (pos) {
+      range = document.createRange();
+      range.setStart(pos.offsetNode, pos.offset);
+      range.collapse(true);
+    }
+  } else if (document.caretRangeFromPoint) {
+    range = document.caretRangeFromPoint(x, y);
+  }
+  if (!range || !el.contains(range.startContainer)) return null;
+  const preRange = range.cloneRange();
+  preRange.selectNodeContents(el);
+  preRange.setEnd(range.startContainer, range.startOffset);
+  return preRange.toString().length;
+}
+
 editor.addEventListener("paste", (e) => {
   e.preventDefault();
   const target = e.target.closest(".line");
