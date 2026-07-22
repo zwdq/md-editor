@@ -8,95 +8,75 @@
 :root {
   --bg: #1a1a1a; --bg-secondary: #252526; --card: #2a2a2a; --border: #3a3a3a;
   --text: #e0e0e0; --muted: #888; --accent: #30CF79; --accent-soft: rgba(48,207,121,.12);
-  --code-bg: #1e1e1e; --preview-bg: #1a1a1a;
+  --code-bg: #1e1e1e; --selection: rgba(48,207,121,.2);
 }
 [data-theme="light"] {
   --bg: #ffffff; --bg-secondary: #f7f8fa; --card: #ffffff; --border: #e4e6ef;
   --text: #2c2c2c; --muted: #888; --accent: #30CF79; --accent-soft: rgba(48,207,121,.08);
-  --code-bg: #f5f5f5; --preview-bg: #ffffff;
+  --code-bg: #f5f5f5; --selection: rgba(48,207,121,.15);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; transition: background .25s, color .25s; }
+::selection { background: var(--selection); }
 
 /* 顶栏 */
-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; background: var(--card); border-bottom: 1px solid var(--border); height: 52px; }
-header h1 { font-size: 16px; font-weight: 600; white-space: nowrap; }
-.header-left { display: flex; align-items: center; gap: 12px; }
-.header-right { display: flex; align-items: center; gap: 6px; }
-.btn { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text); cursor: pointer; font-size: 13px; transition: .15s; white-space: nowrap; }
+header { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; background: var(--card); border-bottom: 1px solid var(--border); height: 48px; }
+.header-left { display: flex; align-items: center; gap: 10px; }
+header h1 { font-size: 15px; font-weight: 600; }
+.header-right { display: flex; align-items: center; gap: 4px; }
+.btn { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text); cursor: pointer; font-size: 12px; transition: .15s; white-space: nowrap; }
 .btn:hover { border-color: var(--accent); color: var(--accent); }
-.btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-.btn.icon { padding: 6px 10px; font-size: 16px; }
+.btn.icon { padding: 5px 8px; font-size: 15px; }
 
-/* 模式切换 */
-.mode-switch { display: flex; gap: 2px; background: var(--bg-secondary); border-radius: 8px; padding: 2px; border: 1px solid var(--border); }
-.mode-switch button { padding: 5px 14px; border-radius: 6px; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 13px; transition: .15s; }
-.mode-switch button.active { background: var(--accent); color: #fff; }
+/* 编辑区 — 单区域，Typora 风格 */
+.editor-wrap { height: calc(100vh - 48px - 28px); overflow-y: auto; }
+.editor-inner { max-width: 760px; margin: 0 auto; padding: 40px 32px 80px; min-height: 100%; }
 
-/* 主体 */
-.main { display: flex; height: calc(100vh - 52px); }
-.pane { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
-.divider { width: 1px; background: var(--border); cursor: col-resize; flex-shrink: 0; position: relative; }
-.divider::after { content: ""; position: absolute; left: -3px; right: -3px; top: 0; bottom: 0; }
+/* 隐藏 textarea，显示渲染区 */
+#editor { display: none; }
+.render-area { outline: none; min-height: 60vh; font-size: 16px; line-height: 1.8; color: var(--text); }
+.render-area:focus { outline: none; }
+.render-area.empty::before { content: attr(data-placeholder); color: var(--muted); pointer-events: none; }
 
-/* 编辑器 */
-.editor-pane textarea {
-  width: 100%; height: 100%; border: 0; resize: none; padding: 24px 32px;
-  background: var(--bg); color: var(--text); font-family: "JetBrains Mono", "SF Mono", Menlo, monospace;
-  font-size: 15px; line-height: 1.8; outline: none; tab-size: 2;
-}
-.editor-pane textarea::placeholder { color: var(--muted); }
+/* 编辑态：段落变成 textarea 风格 */
+.render-area .block { position: relative; border-radius: 6px; padding: 2px 8px; margin: 2px -8px; transition: background .1s; }
+.render-area .block:hover { background: var(--accent-soft); }
+.render-area .block.editing { background: var(--bg-secondary); }
+.render-area .block.editing .block-content { display: none; }
+.render-area .block.editing .block-edit { display: block; }
+.render-area .block-edit { display: none; width: 100%; border: 0; background: transparent; color: var(--text); font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; font-size: 14px; line-height: 1.8; outline: none; resize: none; min-height: 1.8em; padding: 0; overflow: hidden; }
+.render-area .block-content { cursor: text; }
 
-/* 预览 */
-.preview-pane { overflow-y: auto; background: var(--preview-bg); }
-.preview-content { padding: 24px 32px; max-width: 760px; margin: 0 auto; }
+/* Markdown 渲染样式 */
+.render-area h1 { font-size: 1.9em; font-weight: 700; margin: 0.8em 0 0.4em; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; line-height: 1.3; }
+.render-area h2 { font-size: 1.5em; font-weight: 700; margin: 0.8em 0 0.4em; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; line-height: 1.3; }
+.render-area h3 { font-size: 1.25em; font-weight: 700; margin: 0.8em 0 0.4em; line-height: 1.3; }
+.render-area h4 { font-size: 1.05em; font-weight: 700; margin: 0.8em 0 0.4em; }
+.render-area h5, .render-area h6 { font-weight: 700; margin: 0.8em 0 0.4em; }
+.render-area p { margin: 0.6em 0; }
+.render-area a { color: var(--accent); text-decoration: none; }
+.render-area a:hover { text-decoration: underline; }
+.render-area strong { font-weight: 700; }
+.render-area em { font-style: italic; }
+.render-area del { color: var(--muted); }
+.render-area code { font-family: "JetBrains Mono", monospace; font-size: 0.88em; background: var(--code-bg); padding: 2px 6px; border-radius: 4px; }
+.render-area pre { background: var(--code-bg); border-radius: 8px; padding: 14px 16px; overflow-x: auto; margin: 0.8em 0; border: 1px solid var(--border); }
+.render-area pre code { background: transparent; padding: 0; font-size: 14px; line-height: 1.6; }
+.render-area blockquote { border-left: 4px solid var(--accent); padding: 4px 16px; margin: 0.8em 0; color: var(--muted); background: var(--accent-soft); border-radius: 0 8px 8px 0; }
+.render-area ul, .render-area ol { margin: 0.6em 0; padding-left: 1.8em; }
+.render-area li { margin: 0.2em 0; }
+.render-area img { max-width: 100%; border-radius: 8px; margin: 0.6em 0; }
+.render-area table { border-collapse: collapse; width: 100%; margin: 0.8em 0; }
+.render-area th, .render-area td { border: 1px solid var(--border); padding: 6px 12px; text-align: left; }
+.render-area th { background: var(--bg-secondary); font-weight: 700; }
+.render-area hr { border: 0; border-top: 1px solid var(--border); margin: 1.2em 0; }
+.render-area .checkbox { list-style: none; margin-left: -1.2em; }
+.render-area .checkbox input { margin-right: 6px; }
 
-/* Typora 风格 markdown 渲染 */
-.preview-content { font-size: 16px; line-height: 1.8; color: var(--text); }
-.preview-content h1, .preview-content h2, .preview-content h3, .preview-content h4, .preview-content h5, .preview-content h6 { margin-top: 1.4em; margin-bottom: 0.6em; font-weight: 700; line-height: 1.3; }
-.preview-content h1 { font-size: 1.9em; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; }
-.preview-content h2 { font-size: 1.5em; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; }
-.preview-content h3 { font-size: 1.25em; }
-.preview-content h4 { font-size: 1.05em; }
-.preview-content p { margin: 0.8em 0; }
-.preview-content a { color: var(--accent); text-decoration: none; }
-.preview-content a:hover { text-decoration: underline; }
-.preview-content strong { font-weight: 700; }
-.preview-content em { font-style: italic; }
-.preview-content del { color: var(--muted); }
-.preview-content code { font-family: "JetBrains Mono", monospace; font-size: 0.88em; background: var(--code-bg); padding: 2px 6px; border-radius: 4px; }
-.preview-content pre { background: var(--code-bg); border-radius: 8px; padding: 16px; overflow-x: auto; margin: 1em 0; border: 1px solid var(--border); }
-.preview-content pre code { background: transparent; padding: 0; font-size: 14px; line-height: 1.6; }
-.preview-content blockquote { border-left: 4px solid var(--accent); padding: 4px 16px; margin: 1em 0; color: var(--muted); background: var(--accent-soft); border-radius: 0 8px 8px 0; }
-.preview-content blockquote p { margin: 0.4em 0; }
-.preview-content ul, .preview-content ol { margin: 0.8em 0; padding-left: 2em; }
-.preview-content li { margin: 0.3em 0; }
-.preview-content img { max-width: 100%; border-radius: 8px; margin: 1em 0; }
-.preview-content table { border-collapse: collapse; width: 100%; margin: 1em 0; }
-.preview-content th, .preview-content td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; }
-.preview-content th { background: var(--bg-secondary); font-weight: 700; }
-.preview-content hr { border: 0; border-top: 1px solid var(--border); margin: 1.5em 0; }
-.preview-content .checkbox { list-style: none; }
-.preview-content .checkbox input { margin-right: 6px; }
+/* 状态栏 */
+.statusbar { position: fixed; bottom: 0; left: 0; right: 0; height: 28px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--muted); background: var(--card); border-top: 1px solid var(--border); }
 
-/* 隐藏控制 */
-.editor-only .preview-pane { display: none; }
-.preview-only .editor-pane { display: none; }
-.preview-only .divider { display: none; }
-.split .editor-pane { flex: 1; }
-.split .preview-pane { flex: 1; }
-
-/* 底部状态栏 */
-.statusbar { position: fixed; bottom: 0; right: 0; padding: 4px 12px; font-size: 11px; color: var(--muted); background: var(--card); border-top: 1px solid var(--border); border-left: 1px solid var(--border); border-radius: 8px 0 0 0; z-index: 10; }
-
-/* 响应式 */
-@media (max-width: 768px) {
-  .main { flex-direction: column; }
-  .divider { width: 100%; height: 1px; cursor: row-resize; }
-  .split .editor-pane, .split .preview-pane { flex: none; height: 50%; }
-  .editor-pane textarea { padding: 16px; font-size: 14px; }
-  .preview-content { padding: 16px; }
-}
+@media (max-width: 768px) { .editor-inner { padding: 20px 16px 60px; } }
 </style>
 </head>
 <body>
@@ -104,11 +84,6 @@ header h1 { font-size: 16px; font-weight: 600; white-space: nowrap; }
 <header>
   <div class="header-left">
     <h1>✏️ Markdown</h1>
-    <div class="mode-switch">
-      <button onclick="setMode('editor')" id="modeEditor">编辑</button>
-      <button onclick="setMode('split')" id="modeSplit" class="active">分屏</button>
-      <button onclick="setMode('preview')" id="modePreview">预览</button>
-    </div>
   </div>
   <div class="header-right">
     <button class="btn" onclick="insertTemplate()">模板</button>
@@ -120,19 +95,25 @@ header h1 { font-size: 16px; font-weight: 600; white-space: nowrap; }
   </div>
 </header>
 
-<div class="main" id="main">
-  <div class="pane editor-pane">
-    <textarea id="editor" placeholder="开始编写 Markdown…" oninput="render()" spellcheck="false"></textarea>
-  </div>
-  <div class="divider" id="divider"></div>
-  <div class="pane preview-pane">
-    <div class="preview-content" id="preview"></div>
+<div class="editor-wrap" id="editorWrap">
+  <div class="editor-inner">
+    <textarea id="editor" spellcheck="false"></textarea>
+    <div class="render-area" id="renderArea" contenteditable="false" data-placeholder="开始编写 Markdown…" oninput="onBlockInput()"></div>
   </div>
 </div>
 
-<div class="statusbar" id="statusbar">0 字</div>
+<div class="statusbar">
+  <span id="charCount">0 字</span>
+  <span>Typora 风格 · 点击编辑 · 失焦渲染</span>
+</div>
 
 <script>
+let blocks = []; // [{raw: "markdown源码", html: "渲染后HTML"}]
+let editingIndex = -1;
+const editor = document.getElementById("editor");
+const renderArea = document.getElementById("renderArea");
+const editorWrap = document.getElementById("editorWrap");
+
 // ── 主题 ──
 function toggleTheme() {
   const cur = document.documentElement.getAttribute("data-theme") || "light";
@@ -143,50 +124,21 @@ function toggleTheme() {
 }
 (function(){ const t = localStorage.getItem("md_theme") || "light"; document.documentElement.setAttribute("data-theme", t); document.addEventListener("DOMContentLoaded", () => { document.getElementById("themeToggle").textContent = t === "light" ? "🌙" : "☀️"; }); })();
 
-// ── 模式 ──
-function setMode(mode) {
-  const main = document.getElementById("main");
-  main.className = "";
-  if (mode === "editor") main.classList.add("editor-only");
-  else if (mode === "preview") main.classList.add("preview-only");
-  else main.classList.add("split");
-  document.querySelectorAll(".mode-switch button").forEach(b => b.classList.remove("active"));
-  document.getElementById("mode" + mode.charAt(0).toUpperCase() + mode.slice(1)).classList.add("active");
-  localStorage.setItem("md_mode", mode);
-}
-(function(){ const m = localStorage.getItem("md_mode") || "split"; document.addEventListener("DOMContentLoaded", () => setMode(m)); })();
-
-// ── Markdown 渲染器 ──
+// ── Markdown 渲染 ──
 function md2html(md) {
   let html = md;
-
-  // 转义 HTML
   html = html.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-  // 代码块（```lang ... ```）
-  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (m, lang, code) => {
-    return `<pre><code class="lang-${lang}">${code.trim()}</code></pre>`;
-  });
-
-  // 行内代码
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (m, lang, code) => `<pre><code class="lang-${lang}">${code.trim()}</code></pre>`);
   html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
-
-  // 标题
   html = html.replace(/^######\s+(.+)$/gm, "<h6>$1</h6>");
   html = html.replace(/^#####\s+(.+)$/gm, "<h5>$1</h5>");
   html = html.replace(/^####\s+(.+)$/gm, "<h4>$1</h4>");
   html = html.replace(/^###\s+(.+)$/gm, "<h3>$1</h3>");
   html = html.replace(/^##\s+(.+)$/gm, "<h2>$1</h2>");
   html = html.replace(/^#\s+(.+)$/gm, "<h1>$1</h1>");
-
-  // 水平线
   html = html.replace(/^---+$/gm, "<hr>");
-
-  // 引用块
   html = html.replace(/^&gt;\s?(.+)$/gm, "<blockquote>$1</blockquote>");
   html = html.replace(/<\/blockquote>\n<blockquote>/g, "\n");
-
-  // 表格
   html = html.replace(/^\|(.+)\|\n\|([-:\s|]+)\|\n((?:\|.+\|\n?)+)/gm, (m, header, sep, rows) => {
     const heads = header.split("|").map(s => s.trim()).filter(Boolean);
     const ths = heads.map(h => `<th>${h}</th>`).join("");
@@ -196,34 +148,22 @@ function md2html(md) {
     }).join("");
     return `<table><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>`;
   });
-
-  // 任务列表
   html = html.replace(/^-\s\[(x|X|\s)\]\s(.+)$/gm, (m, check, text) => {
     const checked = check.match(/[xX]/) ? "checked" : "";
     return `<li class="checkbox"><input type="checkbox" ${checked} disabled> ${text}</li>`;
   });
-
-  // 无序列表
   html = html.replace(/^[-*+]\s+(.+)$/gm, "<li>$1</li>");
   html = html.replace(/(<li>.*<\/li>\n?)+/g, m => "<ul>" + m + "</ul>");
   html = html.replace(/<\/ul>\n<ul>/g, "");
-
-  // 有序列表
   html = html.replace(/^\d+\.\s+(.+)$/gm, "<li>$1</li>");
-
-  // 粗体、斜体、删除线
   html = html.replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>");
   html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   html = html.replace(/__(.+?)__/g, "<strong>$1</strong>");
   html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
   html = html.replace(/_(.+?)_/g, "<em>$1</em>");
   html = html.replace(/~~(.+?)~~/g, "<del>$1</del>");
-
-  // 链接和图片
   html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
-
-  // 段落（把连续非标签行包成 p）
   html = html.split("\n\n").map(block => {
     block = block.trim();
     if (!block) return "";
@@ -231,65 +171,139 @@ function md2html(md) {
     if (/^<li>/.test(block)) return "<ul>" + block + "</ul>";
     return "<p>" + block.replace(/\n/g, "<br>") + "</p>";
   }).join("\n");
-
   return html;
 }
 
-// ── 渲染 ──
-function render() {
-  const md = document.getElementById("editor").value;
-  document.getElementById("preview").innerHTML = md2html(md);
-  document.getElementById("statusbar").textContent = md.length + " 字";
-  // 自动保存
-  clearTimeout(window._saveTimer);
-  window._saveTimer = setTimeout(() => localStorage.setItem("md_content", md), 500);
+// ── 解析文本为 blocks ──
+function parseBlocks(text) {
+  if (!text.trim()) return [];
+  // 按双换行分块，但代码块不拆分
+  const parts = [];
+  let current = "";
+  let inCode = false;
+  for (const line of text.split("\n")) {
+    if (line.trim().startsWith("```")) inCode = !inCode;
+    if (line === "" && !inCode) {
+      if (current.trim()) { parts.push(current.trim()); current = ""; }
+    } else {
+      current += (current ? "\n" : "") + line;
+    }
+  }
+  if (current.trim()) parts.push(current.trim());
+  return parts.map(raw => ({ raw, html: md2html(raw) }));
 }
 
-// ── 同步滚动 ──
-const editor = document.getElementById("editor");
-const preview = document.querySelector(".preview-pane");
-editor.addEventListener("scroll", () => {
-  if (document.getElementById("main").classList.contains("split")) {
-    const ratio = editor.scrollTop / (editor.scrollHeight - editor.clientHeight || 1);
-    preview.scrollTop = ratio * (preview.scrollHeight - preview.clientHeight || 1);
-  }
-});
+// ── 渲染 blocks ──
+function renderBlocks() {
+  renderArea.innerHTML = "";
+  renderArea.classList.toggle("empty", blocks.length === 0);
 
-// ── 分隔条拖拽 ──
-(function() {
-  const divider = document.getElementById("divider");
-  let dragging = false;
-  divider.addEventListener("mousedown", () => { dragging = true; document.body.style.cursor = "col-resize"; });
-  document.addEventListener("mouseup", () => { dragging = false; document.body.style.cursor = ""; });
-  document.addEventListener("mousemove", e => {
-    if (!dragging) return;
-    const main = document.getElementById("main");
-    const rect = main.getBoundingClientRect();
-    const ratio = (e.clientX - rect.left) / rect.width;
-    if (ratio > 0.15 && ratio < 0.85) {
-      main.style.gridTemplateColumns = "";
-      const panes = main.querySelectorAll(".pane");
-      if (panes.length === 2) {
-        panes[0].style.flex = ratio;
-        panes[1].style.flex = 1 - ratio;
-      }
+  blocks.forEach((block, i) => {
+    const div = document.createElement("div");
+    div.className = "block";
+    div.dataset.index = i;
+
+    const content = document.createElement("div");
+    content.className = "block-content";
+    content.innerHTML = block.html;
+    content.addEventListener("click", () => startEdit(i));
+
+    const editArea = document.createElement("textarea");
+    editArea.className = "block-edit";
+    editArea.value = block.raw;
+    editArea.addEventListener("blur", () => endEdit(i));
+    editArea.addEventListener("input", function() { autoResize(this); });
+    editArea.addEventListener("keydown", e => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); endEdit(i); }
+      if (e.key === "Escape") { e.preventDefault(); endEdit(i, true); }
+    });
+
+    div.appendChild(content);
+    div.appendChild(editArea);
+    renderArea.appendChild(div);
+  });
+
+  // 添加一个空块用于追加
+  const addDiv = document.createElement("div");
+  addDiv.className = "block";
+  addDiv.style.minHeight = "40px";
+  addDiv.addEventListener("click", (e) => {
+    if (e.target === addDiv) {
+      blocks.push({ raw: "", html: "" });
+      renderBlocks();
+      startEdit(blocks.length - 1);
     }
   });
-})();
+  renderArea.appendChild(addDiv);
 
-// ── Tab 缩进 ──
-editor.addEventListener("keydown", e => {
-  if (e.key === "Tab") {
-    e.preventDefault();
-    const start = editor.selectionStart;
-    editor.setRangeText("  ", start, start, "end");
+  updateStatus();
+}
+
+// ── 编辑块 ──
+function startEdit(i) {
+  if (editingIndex === i) return;
+  if (editingIndex >= 0) endEdit(editingIndex);
+  editingIndex = i;
+  const block = renderArea.children[i];
+  if (!block) return;
+  block.classList.add("editing");
+  const ta = block.querySelector(".block-edit");
+  ta.value = blocks[i].raw;
+  autoResize(ta);
+  ta.focus();
+  // 光标放末尾
+  ta.selectionStart = ta.value.length;
+}
+
+function endEdit(i, cancel) {
+  if (i < 0 || i >= blocks.length) return;
+  const block = renderArea.children[i];
+  if (!block) return;
+  const ta = block.querySelector(".block-edit");
+  if (!cancel) {
+    const raw = ta.value;
+    blocks[i] = { raw, html: md2html(raw) };
   }
-});
+  block.classList.remove("editing");
+  editingIndex = -1;
+  // 删除空块
+  if (!cancel && !blocks[i].raw.trim()) {
+    blocks.splice(i, 1);
+    renderBlocks();
+  } else {
+    // 更新内容
+    const content = block.querySelector(".block-content");
+    if (content) content.innerHTML = blocks[i].html;
+  }
+  saveContent();
+}
+
+function onBlockInput() {
+  // contenteditable 不直接用
+}
+
+function autoResize(ta) {
+  ta.style.height = "auto";
+  ta.style.height = ta.scrollHeight + "px";
+}
+
+// ── 保存 ──
+function saveContent() {
+  const text = blocks.map(b => b.raw).join("\n\n");
+  editor.value = text;
+  clearTimeout(window._saveTimer);
+  window._saveTimer = setTimeout(() => localStorage.setItem("md_content", text), 500);
+  updateStatus();
+}
+
+function updateStatus() {
+  const text = blocks.map(b => b.raw).join("\n\n");
+  document.getElementById("charCount").textContent = text.length + " 字";
+}
 
 // ── 文件操作 ──
 function downloadMD() {
-  const content = editor.value;
-  const blob = new Blob([content], { type: "text/markdown" });
+  const blob = new Blob([editor.value], { type: "text/markdown" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = "document-" + new Date().toISOString().slice(0,10) + ".md";
@@ -299,17 +313,21 @@ function downloadMD() {
 function uploadFile(event) {
   const file = event.target.files[0];
   if (!file) return;
-  file.text().then(text => { editor.value = text; render(); });
+  file.text().then(text => {
+    blocks = parseBlocks(text);
+    renderBlocks();
+    saveContent();
+  });
   event.target.value = "";
 }
 
 function copyHTML() {
-  const html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><style>body{font-family:sans-serif;max-width:760px;margin:40px auto;padding:0 20px;line-height:1.8;}pre{background:#f5f5f5;padding:16px;border-radius:8px;overflow-x:auto;}code{background:#f5f5f5;padding:2px 6px;border-radius:4px;}blockquote{border-left:4px solid #30CF79;padding-left:16px;color:#666;margin-left:0;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #ddd;padding:8px 12px;}img{max-width:100%;}</style></head><body>" + document.getElementById("preview").innerHTML + "</body></html>";
+  const html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><style>body{font-family:sans-serif;max-width:760px;margin:40px auto;padding:0 20px;line-height:1.8;}pre{background:#f5f5f5;padding:16px;border-radius:8px;overflow-x:auto;}code{background:#f5f5f5;padding:2px 6px;border-radius:4px;}blockquote{border-left:4px solid #30CF79;padding-left:16px;color:#666;margin-left:0;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #ddd;padding:8px 12px;}img{max-width:100%;}</style></head><body>" + blocks.map(b => b.html).join("\n") + "</body></html>";
   navigator.clipboard.writeText(html).then(() => alert("HTML 已复制到剪贴板"));
 }
 
 function insertTemplate() {
-  editor.value = `# 标题
+  const template = `# 标题
 
 这是一段**粗体**和*斜体*文字。
 
@@ -317,7 +335,6 @@ function insertTemplate() {
 
 - 无序项目一
 - 无序项目二
-  - 子项目
 
 1. 有序项目一
 2. 有序项目二
@@ -351,17 +368,18 @@ def hello():
 
 [链接文字](https://example.com)
 
-![图片](https://via.placeholder.com/400x200)
-
 ---
 
-<del>删除线</del>`;
-  render();
+~~删除线~~`;
+  blocks = parseBlocks(template);
+  renderBlocks();
+  saveContent();
 }
 
 // ── 初始化 ──
-editor.value = localStorage.getItem("md_content") || "";
-render();
+const saved = localStorage.getItem("md_content") || "";
+blocks = saved ? parseBlocks(saved) : [];
+renderBlocks();
 </script>
 </body>
 </html>
