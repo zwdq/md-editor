@@ -150,7 +150,7 @@ header h1 { font-size: 15px; font-weight: 600; }
         <div class="dropdown-menu" id="ddMenu">
           <div class="menu-item" onclick="insertTemplate();closeDropdown()"><span class="menu-icon">📋</span> 插入模板</div>
           <div class="menu-item" onclick="downloadMD();closeDropdown()"><span class="menu-icon">⬇️</span> 下载 MD</div>
-          <div class="menu-item" onclick="document.getElementById('uploadFile').click();closeDropdown()"><span class="menu-icon">📤</span> 导入文件</div>
+          <div class="menu-item" onclick="document.getElementById('uploadFile').click();closeDropdown()"><span class="menu-icon">📤</span> 导入文件（可多选）</div>
           <div class="menu-item" onclick="exportAll();closeDropdown()"><span class="menu-icon">📦</span> 导出全部</div>
           <div class="menu-item" onclick="copyHTML();closeDropdown()"><span class="menu-icon">📄</span> 复制 HTML</div>
           <div class="menu-sep"></div>
@@ -158,7 +158,7 @@ header h1 { font-size: 15px; font-weight: 600; }
           <div class="menu-item" onclick="logout();closeDropdown()"><span class="menu-icon">🚪</span> 退出</div>
         </div>
       </div>
-      <input type="file" id="uploadFile" accept=".md,.txt,.markdown,.json" style="display:none" onchange="uploadFile(event)">
+      <input type="file" id="uploadFile" accept=".md,.txt,.markdown,.json" multiple style="display:none" onchange="uploadFile(event)">
     </div>
   </header>
   <div class="main-layout">
@@ -397,26 +397,34 @@ function downloadFile(name, content) {
 }
 
 async function uploadFile(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const text = await file.text();
-  if (file.name.endsWith(".json")) {
-    // 批量导入
+  const files = Array.from(event.target.files);
+  if (!files.length) return;
+
+  // JSON 批量导入
+  if (files.length === 1 && files[0].name.endsWith(".json")) {
     try {
+      const text = await files[0].text();
       const arr = JSON.parse(text);
       const r = await api("POST", "/docs/import", arr);
-      alert("导入成功：" + (r.imported || 0) + " 篇");
+      toast("批量导入成功：" + (r.imported || 0) + " 篇");
       await loadDocList();
-    } catch(e) { alert("JSON 解析失败"); }
-  } else {
-    // 单个 .md 文件
-    const title = file.name.replace(/\.md$|\.txt$|\.markdown$/, "");
-    const r = await api("POST", "/docs", { title, content: text });
-    if (r.success) {
-      await loadDocList();
-      await openDoc(r.data.id);
-    }
+    } catch(e) { toast("JSON 解析失败"); }
+    event.target.value = "";
+    return;
   }
+
+  // 多个 .md 文件批量导入
+  let imported = 0;
+  for (const file of files) {
+    const text = await file.text();
+    const title = file.name.replace(/\.md$|\.txt$|\.markdown$/, "");
+    const r = await api("POST", "/docs", { title, content: text, folder: "导入" });
+    if (r.success) imported++;
+  }
+  toast("导入成功：" + imported + " 篇");
+  await loadDocList();
+  // 打开最后一个
+  if (docs.length > 0) await openDoc(docs[0].id);
   event.target.value = "";
 }
 
