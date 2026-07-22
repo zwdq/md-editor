@@ -149,6 +149,7 @@ let activeLine = -1;
 let expandedFolders = {};
 
 // ── 认证 ──
+function esc(s) { return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 
 async function doLogin() {
   const pw = document.getElementById("passwordInput").value;
