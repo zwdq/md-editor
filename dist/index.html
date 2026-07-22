@@ -67,32 +67,226 @@ header h1 { font-size: 15px; font-weight: 600; }
 
 .statusbar { height: 28px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--muted); background: var(--card); border-top: 1px solid var(--border); flex-shrink: 0; }
 .layout { display: flex; flex-direction: column; height: 100vh; }
-@media (max-width: 768px) { .editor-area { padding: 16px; } }
+.main-layout { display: flex; flex: 1; overflow: hidden; }
+
+/* 侧栏 */
+.sidebar { width: 240px; background: var(--card); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+.sidebar-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.sidebar-header h2 { font-size: 14px; }
+.sidebar-list { flex: 1; overflow-y: auto; padding: 8px; }
+.doc-item { padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--muted); transition: .12s; margin-bottom: 4px; }
+.doc-item:hover { background: var(--bg-secondary); color: var(--text); }
+.doc-item.active { background: var(--accent-soft); color: var(--accent); }
+.doc-item .doc-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.doc-item .doc-time { font-size: 11px; opacity: .6; margin-top: 2px; }
+.doc-item .doc-del { float: right; opacity: 0; font-size: 12px; }
+.doc-item:hover .doc-del { opacity: 1; }
+.sidebar-footer { padding: 8px; border-top: 1px solid var(--border); display: flex; gap: 4px; }
+
+/* 登录 */
+.login-wrap { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+.login-box { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 40px; width: 340px; text-align: center; }
+.login-box h1 { font-size: 24px; margin-bottom: 8px; }
+.login-box p { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+.login-box input { width: 100%; padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 15px; margin-bottom: 16px; }
+.login-box button { width: 100%; padding: 12px; border-radius: 10px; border: 0; cursor: pointer; background: var(--accent); color: #fff; font-size: 15px; font-weight: 600; }
+
+@media (max-width: 768px) { .editor-area { padding: 16px; } .sidebar { display: none; } }
 </style>
 </head>
 <body>
-<div class="layout">
+<!-- 登录 -->
+<div class="login-wrap" id="loginPage">
+  <div class="login-box">
+    <h1>✏️ Markdown</h1>
+    <p>输入密码进入</p>
+    <input type="password" id="passwordInput" placeholder="访问密码" onkeyup="if(event.key==='Enter')doLogin()">
+    <button onclick="doLogin()">进入</button>
+  </div>
+</div>
+
+<div class="layout" id="mainApp" style="display:none">
   <header>
     <h1>✏️ Markdown</h1>
     <div class="header-right">
+      <button class="btn" onclick="newDoc()">新建</button>
+      <button class="btn" onclick="saveDoc()">保存</button>
       <button class="btn" onclick="insertTemplate()">模板</button>
       <button class="btn" onclick="downloadMD()">下载</button>
-      <button class="btn" onclick="document.getElementById('uploadFile').click()">打开</button>
+      <button class="btn" onclick="document.getElementById('uploadFile').click()">导入文件</button>
       <input type="file" id="uploadFile" accept=".md,.txt,.markdown" style="display:none" onchange="uploadFile(event)">
+      <button class="btn" onclick="exportAll()">导出全部</button>
       <button class="btn" onclick="copyHTML()">复制HTML</button>
       <button class="btn icon" id="themeToggle" onclick="toggleTheme()">🌙</button>
+      <button class="btn" onclick="logout()">退出</button>
     </div>
   </header>
-  <div class="editor-scroll" id="scroll">
-    <div class="editor-area" id="editor"></div>
+  <div class="main-layout">
+    <aside class="sidebar">
+      <div class="sidebar-header"><h2>📄 文档</h2></div>
+      <div class="sidebar-list" id="docList"></div>
+      <div class="sidebar-footer">
+        <button class="btn" onclick="newDoc()" style="flex:1">+ 新建</button>
+      </div>
+    </aside>
+    <div class="editor-scroll" id="scroll">
+      <div class="editor-area" id="editor"></div>
+    </div>
   </div>
   <div class="statusbar">
     <span id="charCount">0 字 · 0 行</span>
-    <span>Typora 风格 · 点击编辑 · 失焦渲染</span>
+    <span id="docStatus">未保存</span>
   </div>
 </div>
 
 <script>
+// ── 认证 ──
+let token = localStorage.getItem("md_token") || "";
+let currentDocId = null;
+
+async function doLogin() {
+  const pw = document.getElementById("passwordInput").value;
+  if (!pw) return;
+  token = pw;
+  const r = await api("GET", "/docs");
+  if (r.success !== false) { localStorage.setItem("md_token", token); showApp(); }
+  else alert("密码错误");
+}
+function logout() { localStorage.removeItem("md_token"); token = ""; location.reload(); }
+
+async function api(method, path, body) {
+  const opts = { method, headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" } };
+  if (body) opts.body = JSON.stringify(body);
+  try { const r = await fetch("/api" + path, opts); return await r.json(); }
+  catch (e) { return { success: false, error: e.message }; }
+}
+
+async function showApp() {
+  document.getElementById("loginPage").style.display = "none";
+  document.getElementById("mainApp").style.display = "flex";
+  const t = document.documentElement.getAttribute("data-theme") || "light";
+  document.getElementById("themeToggle").textContent = t === "light" ? "🌙" : "☀️";
+  await loadDocList();
+  // 如果有文档，打开第一个
+  if (docs.length > 0) await openDoc(docs[0].id);
+  else newDoc();
+}
+
+// ── 文档管理 ──
+let docs = [];
+
+async function loadDocList() {
+  const r = await api("GET", "/docs");
+  docs = r.data || [];
+  renderDocList();
+}
+
+function renderDocList() {
+  const el = document.getElementById("docList");
+  if (!docs.length) { el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:12px;">暂无文档</div>'; return; }
+  el.innerHTML = docs.map(d => `
+    <div class="doc-item ${currentDocId === d.id ? "active" : ""}" onclick="openDoc(${d.id})">
+      <span class="doc-del" onclick="event.stopPropagation();delDoc(${d.id})">🗑️</span>
+      <div class="doc-title">${esc(d.title || "无标题")}</div>
+      <div class="doc-time">${(d.updated_at || "").slice(0,16)}</div>
+    </div>`).join("");
+}
+
+async function openDoc(id) {
+  // 先保存当前
+  if (currentDocId) await saveDocSilent();
+  const r = await api("GET", "/docs/" + id);
+  if (!r.success) return;
+  currentDocId = id;
+  const text = r.data.content || "";
+  initLines(text);
+  renderAll();
+  renderDocList();
+  document.getElementById("docStatus").textContent = "已保存";
+}
+
+async function newDoc() {
+  if (currentDocId) await saveDocSilent();
+  currentDocId = null;
+  initLines("");
+  renderAll();
+  renderDocList();
+  document.getElementById("docStatus").textContent = "新文档";
+}
+
+async function saveDoc() {
+  const text = lines.map(l => l.text).join("\n");
+  const title = lines.find(l => /^#\s/.test(l.text.trim()))?.text?.replace(/^#\s+/, "")?.trim() || text.split("\n")[0]?.slice(0, 50) || "无标题";
+  if (currentDocId) {
+    await api("PUT", "/docs/" + currentDocId, { title, content: text });
+  } else {
+    const r = await api("POST", "/docs", { title, content: text });
+    if (r.success) currentDocId = r.data.id;
+  }
+  await loadDocList();
+  document.getElementById("docStatus").textContent = "已保存 " + new Date().toLocaleTimeString();
+}
+
+async function saveDocSilent() {
+  if (!currentDocId) return;
+  const text = lines.map(l => l.text).join("\n");
+  await api("PUT", "/docs/" + currentDocId, { content: text });
+}
+
+async function delDoc(id) {
+  if (!confirm("确定删除此文档？")) return;
+  await api("DELETE", "/docs/" + id);
+  if (currentDocId === id) { currentDocId = null; newDoc(); }
+  await loadDocList();
+}
+
+// ── 导入导出 ──
+async function exportAll() {
+  const r = await api("GET", "/docs/export");
+  const data = r.data || [];
+  // 每个文档导出为单独的 .md 文件（打包成 zip 不现实，改为逐个下载）
+  if (data.length === 0) { alert("没有文档可导出"); return; }
+  if (data.length === 1) {
+    downloadFile(data[0].title + ".md", data[0].content);
+    return;
+  }
+  // 多个文档合并成一个 JSON 下载
+  const json = JSON.stringify(data.map(d => ({ title: d.title, content: d.content })), null, 2);
+  downloadFile("documents-export.json", json);
+}
+
+function downloadFile(name, content) {
+  const blob = new Blob([content], { type: "text/plain" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+}
+
+async function uploadFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const text = await file.text();
+  if (file.name.endsWith(".json")) {
+    // 批量导入
+    try {
+      const arr = JSON.parse(text);
+      const r = await api("POST", "/docs/import", arr);
+      alert("导入成功：" + (r.imported || 0) + " 篇");
+      await loadDocList();
+    } catch(e) { alert("JSON 解析失败"); }
+  } else {
+    // 单个 .md 文件
+    const title = file.name.replace(/\.md$|\.txt$|\.markdown$/, "");
+    const r = await api("POST", "/docs", { title, content: text });
+    if (r.success) {
+      await loadDocList();
+      await openDoc(r.data.id);
+    }
+  }
+  event.target.value = "";
+}
+
 const editor = document.getElementById("editor");
 const scroll = document.getElementById("scroll");
 let lines = []; // [{text: "markdown源码", html: "渲染HTML"}]
@@ -514,9 +708,7 @@ function insertTemplate() {
 }
 
 // ── 初始化 ──
-const saved = localStorage.getItem("md_content") || "";
-initLines(saved);
-renderAll();
+if (token) { showApp(); }
 </script>
 </body>
 </html>
