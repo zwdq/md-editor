@@ -100,6 +100,9 @@ header h1 { font-size: 15px; font-weight: 600; }
 .doc-item .doc-del { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); opacity: 0; font-size: 11px; }
 .doc-item:hover .doc-del { opacity: .6; }
 .doc-item .doc-del:hover { opacity: 1; color: #e55; }
+.doc-item .doc-rename { position: absolute; right: 24px; top: 50%; transform: translateY(-50%); opacity: 0; font-size: 11px; }
+.doc-item:hover .doc-rename { opacity: .6; }
+.doc-item .doc-rename:hover { opacity: 1; color: var(--accent); }
 
 .sidebar-footer { padding: 6px 8px; border-top: 1px solid var(--border); display: flex; gap: 4px; }
 .sidebar-footer .btn { flex: 1; text-align: center; }
@@ -375,6 +378,7 @@ function renderDocList() {
         ${items.map(d => `
           <div class="doc-item ${currentDocId === d.id ? "active" : ""} ${d._flash ? "flash" : ""}" onclick="openDoc(${d.id})">
             <span class="doc-del" onclick="event.stopPropagation();delDoc(${d.id})">🗑️</span>
+            <span class="doc-rename" onclick="event.stopPropagation();renameDoc(${d.id})">✏️</span>
             <div class="doc-title">${esc(d.title || "无标题")}</div>
             <div class="doc-time">${(d.updated_at || "").slice(5,16)}</div>
           </div>`).join("")}
@@ -488,6 +492,17 @@ async function delDoc(id) {
   await api("DELETE", "/docs/" + id);
   if (currentDocId === id) { currentDocId = null; newDoc(); }
   await loadDocList();
+}
+
+async function renameDoc(id) {
+  const d = docs.find(x => x.id === id);
+  if (!d) return;
+  const title = prompt("修改文档名称：", d.title || "无标题");
+  if (title === null) return;
+  if (!title.trim()) { toast("名称不能为空"); return; }
+  await api("PUT", "/docs/" + id, { title: title.trim() });
+  await loadDocList();
+  toast("已重命名");
 }
 
 // ── 导入导出 ──
