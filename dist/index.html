@@ -217,19 +217,22 @@ function commitLine(i) {
   div.innerHTML = lines[i].html || "";
 }
 
-// ── 行失焦 ──
+// ── 行失焦 ──（去掉 blur 依赖，改为主动触发）
 function onLineBlur(i) {
-  setTimeout(() => {
-    const focused = document.activeElement;
-    const focusedLine = focused?.closest?.(".line");
-    if (!focusedLine || parseInt(focusedLine.dataset.index) !== i) {
-      if (activeLine === i) {
-        commitLine(i);
-        activeLine = -1;
-        saveContent();
-      }
-    }
-  }, 50);
+  // 不做任何事，渲染由 onLineFocus/Enter/方向键 主动触发
+}
+
+// ── 渲染当前行并切到目标行 ──
+function switchToLine(targetIndex) {
+  if (activeLine >= 0 && activeLine !== targetIndex) {
+    commitLine(activeLine);
+    activeLine = -1;
+    saveContent();
+  }
+  const div = editor.children[targetIndex];
+  if (div) {
+    onLineFocus(targetIndex);
+  }
 }
 
 // ── 键盘处理 ──
@@ -238,17 +241,14 @@ editor.addEventListener("keydown", (e) => {
   if (!target) return;
   const i = parseInt(target.dataset.index);
 
-  // Enter: 拆分新行
+  // Enter: 拆分新行，当前行立即渲染
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
-    const sel = window.getSelection();
-    const range = sel.getRangeAt(0);
     const offset = getCaretOffset(target);
-
     const before = target.textContent.slice(0, offset);
     const after = target.textContent.slice(offset);
 
-    // 提交当前行
+    // 提交当前行（渲染）
     lines[i].text = before;
     lines[i].html = renderLine(before);
     target.classList.remove("editing");
@@ -262,6 +262,31 @@ editor.addEventListener("keydown", (e) => {
     refreshIndices();
     newDiv.focus();
     saveContent();
+    return;
+  }
+
+  // 上方向键：渲染当前行，跳到上一行
+  if (e.key === "ArrowUp" && i > 0) {
+    const offset = getCaretOffset(target);
+    // 只在光标在第一行时才跳（简化：直接跳）
+    e.preventDefault();
+    commitLine(i);
+    activeLine = -1;
+    saveContent();
+    const prevDiv = editor.children[i - 1];
+    prevDiv.focus();
+    return;
+  }
+
+  // 下方向键：渲染当前行，跳到下一行
+  if (e.key === "ArrowDown" && i < editor.children.length - 1) {
+    e.preventDefault();
+    commitLine(i);
+    activeLine = -1;
+    saveContent();
+    const nextDiv = editor.children[i + 1];
+    nextDiv.focus();
+    return;
   }
 
   // Backspace: 行首合并
@@ -270,7 +295,6 @@ editor.addEventListener("keydown", (e) => {
     if (offset === 0 && i > 0) {
       e.preventDefault();
       const curText = target.textContent;
-      const prevDiv = editor.children[i - 1];
       const prevText = lines[i - 1].text;
       const mergeText = prevText + curText;
 
@@ -279,7 +303,6 @@ editor.addEventListener("keydown", (e) => {
       lines.splice(i, 1);
       renderAll();
 
-      // 聚焦上一行，光标在合并处
       const newPrev = editor.children[i - 1];
       newPrev.focus();
       setTimeout(() => {
