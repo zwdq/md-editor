@@ -60,6 +60,9 @@ header h1 { font-size: 15px; font-weight: 600; }
 .line .checkbox { list-style: none; margin-left: -1.2em; }
 .line .checkbox input { margin-right: 6px; }
 .line.editing { font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; font-size: 14px; white-space: pre-wrap; word-break: break-word; }
+.line.code-line { font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; font-size: 14px; color: var(--text); }
+.line.code-line code-line { display: block; white-space: pre-wrap; }
+.line:has(+ .code-line).code-line, .line.code-line:has(+ .code-line) { } /* 连续代码行 */
 
 .statusbar { height: 28px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--muted); background: var(--card); border-top: 1px solid var(--border); flex-shrink: 0; }
 .layout { display: flex; flex-direction: column; height: 100vh; }
@@ -105,13 +108,19 @@ function toggleTheme() {
 (function(){ const t = localStorage.getItem("md_theme") || "light"; document.documentElement.setAttribute("data-theme", t); document.addEventListener("DOMContentLoaded", () => { document.getElementById("themeToggle").textContent = t === "light" ? "🌙" : "☀️"; }); })();
 
 // ── Markdown 单行渲染 ──
-function renderLine(text) {
+function renderLine(text, inCodeBlock) {
+  // 代码块内：原样显示
+  if (inCodeBlock) {
+    return `<code-line>${text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</code-line>`;
+  }
   let html = text;
   if (!html.trim()) return "";
   html = html.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   // 行内代码先提取
   const codes = [];
   html = html.replace(/`([^`]+)`/g, (m, c) => { codes.push(c); return `\x00${codes.length-1}\x00`; });
+  // 代码块标记行
+  if (/^```/.test(html.trim())) return "```CODE_FENCE```";
   // 标题
   if (/^######\s/.test(html)) html = `<h6>${html.replace(/^######\s+/, "")}</h6>`;
   else if (/^#####\s/.test(html)) html = `<h5>${html.replace(/^#####\s+/, "")}</h5>`;
@@ -147,17 +156,31 @@ function renderLine(text) {
   return html;
 }
 
-// ── 初始化行 ──
+// ── 初始化行（标记代码块）──
 function initLines(text) {
-  lines = text.split("\n").map(t => ({ text: t, html: renderLine(t) }));
-  if (lines.length === 0) lines.push({ text: "", html: "" });
+  lines = text.split("\n").map(t => ({ text: t, html: "", inCode: false }));
+  // 扫描代码块
+  let inCode = false;
+  for (let i = 0; i < lines.length; i++) {
+    const isFence = /^```/.test(lines[i].text.trim());
+    if (isFence) {
+      lines[i].inCode = false; // 标记行本身不在代码块内
+      lines[i].html = "```CODE_FENCE```";
+      inCode = !inCode;
+    } else {
+      lines[i].inCode = inCode;
+      lines[i].html = renderLine(lines[i].text, inCode);
+    }
+  }
+  if (lines.length === 0) lines.push({ text: "", html: "", inCode: false });
 }
 
 // ── 创建行元素 ──
 function createLineEl(i) {
   const div = document.createElement("div");
-  div.className = "line" + (lines[i].text.trim() === "" ? " empty" : "");
+  div.className = "line" + (lines[i].text.trim() === "" ? " empty" : "") + (lines[i].inCode ? " code-line" : "");
   div.dataset.index = i;
+  div.dataset.inCode = lines[i].inCode ? "1" : "0";
   div.contentEditable = "true";
   div.spellcheck = false;
   div.innerHTML = lines[i].html || "";
@@ -222,10 +245,34 @@ function commitLine(i) {
   if (!div) return;
   // 从内存读取（input 事件已实时保存）
   const text = lines[i].text;
-  lines[i].html = renderLine(text);
+  // 重新计算代码块状态（当前行及后续行）
+  recomputeCodeBlocks(i);
   div.classList.remove("editing");
   div.classList.toggle("empty", text.trim() === "");
   div.innerHTML = lines[i].html || "";
+}
+
+// 重新计算从第 i 行开始的代码块状态
+function recomputeCodeBlocks(fromLine) {
+  // 找到上一个代码块标记，确定起始状态
+  let inCode = false;
+  for (let j = 0; j <= fromLine && j < lines.length; j++) {
+    if (/^```/.test(lines[j].text.trim())) {
+      inCode = !inCode;
+    }
+  }
+  // fromLine 本身
+  for (let i = fromLine; i < lines.length; i++) {
+    const isFence = /^```/.test(lines[i].text.trim());
+    if (isFence) {
+      lines[i].inCode = false;
+      lines[i].html = "```CODE_FENCE```";
+      inCode = !inCode;
+    } else {
+      lines[i].inCode = inCode;
+      lines[i].html = renderLine(lines[i].text, inCode);
+    }
+  }
 }
 
 // ── 行失焦 ──（去掉 blur 依赖，改为主动触发）
@@ -269,9 +316,15 @@ editor.addEventListener("keydown", (e) => {
     target.innerHTML = lines[i].html || "";
 
     // 插入新行
-    lines.splice(i + 1, 0, { text: after, html: renderLine(after) });
+    lines.splice(i + 1, 0, { text: after, html: "", inCode: false });
+    recomputeCodeBlocks(i + 1);
     const newDiv = createLineEl(i + 1);
     editor.insertBefore(newDiv, target.nextSibling);
+    // 更新后续行的 DOM（代码块状态可能变了）
+    for (let j = i + 2; j < editor.children.length; j++) {
+      editor.children[j].className = "line" + (lines[j].text.trim() === "" ? " empty" : "") + (lines[j].inCode ? " code-line" : "");
+      editor.children[j].innerHTML = lines[j].html || "";
+    }
     refreshIndices();
     newDiv.focus();
     saveContent();
@@ -419,6 +472,15 @@ function insertTemplate() {
 ## 代码
 
 行内代码 \`code\`
+
+\`\`\`python
+def hello():
+    print("Hello, World!")
+\`\`\`
+
+\`\`\`javascript
+const x = () => console.log("hi");
+\`\`\``
 
 ## 引用
 
