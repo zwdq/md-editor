@@ -140,9 +140,15 @@ header h1 { font-size: 15px; font-weight: 600; }
 </div>
 
 <script>
-// ── 认证 ──
+// ── 全局变量（提前声明避免 TDZ）──
 let token = localStorage.getItem("md_token") || "";
 let currentDocId = null;
+let docs = [];
+let lines = [];
+let activeLine = -1;
+let expandedFolders = {};
+
+// ── 认证 ──
 
 async function doLogin() {
   const pw = document.getElementById("passwordInput").value;
@@ -173,7 +179,6 @@ async function showApp() {
 }
 
 // ── 文档管理 ──
-let docs = [];
 
 async function loadDocList() {
   const r = await api("GET", "/docs");
@@ -289,8 +294,6 @@ async function uploadFile(event) {
 
 const editor = document.getElementById("editor");
 const scroll = document.getElementById("scroll");
-let lines = []; // [{text: "markdown源码", html: "渲染HTML"}]
-let activeLine = -1;
 
 // ── 主题 ──
 function toggleTheme() {
