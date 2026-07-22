@@ -105,6 +105,17 @@ export async function onRequest(context) {
       return json({ success: true, data: result.results });
     }
 
+    // GET /api/search?q=关键词 — 搜索文档标题和正文
+    if (path === "/search" && request.method === "GET") {
+      const q = url.searchParams.get("q") || "";
+      if (!q.trim()) return json({ success: false, error: "缺少搜索关键词 q" }, 400);
+      const keyword = `%${q.trim()}%`;
+      const result = await env.DB.prepare(
+        "SELECT id, title, folder, substr(content, 1, 200) as preview, created_at, updated_at FROM documents WHERE title LIKE ? OR content LIKE ? ORDER BY updated_at DESC"
+      ).bind(keyword, keyword).all();
+      return json({ success: true, data: result.results, total: result.results.length });
+    }
+
     return json({ success: false, error: "未找到路由: " + path }, 404);
   } catch (e) {
     return json({ success: false, error: e.message }, 500);
