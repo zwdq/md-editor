@@ -457,18 +457,18 @@ async function newDoc() {
 
 async function saveDoc() {
   const text = lines.map(l => l.text).join("\n");
-  const title = lines.find(l => /^#\s/.test(l.text.trim()))?.text?.replace(/^#\s+/, "")?.trim() || text.split("\n")[0]?.slice(0, 50) || "无标题";
-  // 获取当前文档的文件夹
-  const curDoc = docs.find(d => d.id === currentDocId);
-  const folder = curDoc?.folder || "默认";
   if (currentDocId) {
-    await api("PUT", "/docs/" + currentDocId, { title, content: text });
+    // 已有文档：只更新 content，不改 title
+    await api("PUT", "/docs/" + currentDocId, { content: text });
   } else {
+    // 新建文档：首次保存时提取标题
+    const title = lines.find(l => /^#\s/.test(l.text.trim()))?.text?.replace(/^#\s+/, "")?.trim() || text.split("\n")[0]?.slice(0, 50) || "无标题";
+    const curDoc = docs.find(d => d.id === currentDocId);
+    const folder = curDoc?.folder || "默认";
     const r = await api("POST", "/docs", { title, content: text, folder });
     if (r.success) currentDocId = r.data.id;
   }
   await loadDocList();
-  // 标记当前文档闪烁
   const d = docs.find(x => x.id === currentDocId);
   if (d) d._flash = true;
   renderDocList();
@@ -479,8 +479,8 @@ async function saveDoc() {
 async function saveDocSilent() {
   if (!currentDocId) return;
   const text = lines.map(l => l.text).join("\n");
-  const title = lines.find(l => /^#\s/.test(l.text.trim()))?.text?.replace(/^#\s+/, "")?.trim() || text.split("\n")[0]?.slice(0, 50) || "无标题";
-  await api("PUT", "/docs/" + currentDocId, { content: text, title });
+  // 只更新 content，不改 title
+  await api("PUT", "/docs/" + currentDocId, { content: text });
 }
 
 async function delDoc(id) {
