@@ -255,9 +255,11 @@ editor.addEventListener("keydown", (e) => {
   // Enter: 拆分新行，当前行立即渲染
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
+    // 从内存读源码（input 事件已实时保存），不从 DOM 读
+    const fullText = lines[i].text;
     const offset = getCaretOffset(target);
-    const before = target.textContent.slice(0, offset);
-    const after = target.textContent.slice(offset);
+    const before = fullText.slice(0, offset);
+    const after = fullText.slice(offset);
 
     // 提交当前行（渲染）
     lines[i].text = before;
@@ -305,8 +307,8 @@ editor.addEventListener("keydown", (e) => {
     const offset = getCaretOffset(target);
     if (offset === 0 && i > 0) {
       e.preventDefault();
-      const curText = target.textContent;
-      const prevText = lines[i - 1].text;
+      const curText = lines[i].text;  // 从内存读
+      const prevText = lines[i - 1].text;  // 从内存读
       const mergeText = prevText + curText;
 
       lines[i - 1].text = mergeText;
