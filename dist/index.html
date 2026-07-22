@@ -649,6 +649,28 @@ function isCodeNavLine(index) {
   return !!line && (line.inCode || isFenceLine(line.text));
 }
 
+function lineClassName(index) {
+  const line = lines[index];
+  return "line" + (line.text.trim() === "" ? " empty" : "") + (line.inCode ? " code-line" : "");
+}
+
+function refreshLineElement(index) {
+  const el = editor.children[index];
+  if (!el) return;
+  el.className = lineClassName(index);
+  el.dataset.index = index;
+  el.dataset.inCode = lines[index].inCode ? "1" : "0";
+  el.innerHTML = lines[index].html || "";
+}
+
+function refreshLineRange(startIndex = 0) {
+  for (let index = startIndex; index < editor.children.length; index++) {
+    const el = editor.children[index];
+    if (!el || el.classList.contains("editing")) continue;
+    refreshLineElement(index);
+  }
+}
+
 // ── 初始化行（标记代码块）──
 function initLines(text) {
   lines = text.split("\n").map(t => ({ text: t, html: "", inCode: false }));
@@ -670,7 +692,7 @@ function initLines(text) {
 // ── 创建行元素 ──
 function createLineEl(i) {
   const div = document.createElement("div");
-  div.className = "line" + (lines[i].text.trim() === "" ? " empty" : "") + (lines[i].inCode ? " code-line" : "");
+  div.className = lineClassName(i);
   div.dataset.index = i;
   div.dataset.inCode = lines[i].inCode ? "1" : "0";
   div.contentEditable = "true";
@@ -740,6 +762,7 @@ function recomputeAllCodeBlocks() {
 
 // ── 行聚焦：换成源码 ──
 let pendingCaret = null;
+let desiredCodeColumn = null;
 
 function consumePendingCaret(index, fallbackOffset) {
   if (pendingCaret && pendingCaret.index === index) {
@@ -783,6 +806,12 @@ function focusLine(index, offset = null) {
   if (div) div.focus();
 }
 
+function ensureEditablePlaceholder(el) {
+  if (el.textContent === "") {
+    el.innerHTML = "<br>";
+  }
+}
+
 function onLineFocus(i, caretOffset = null) {
   // 先渲染上一行
   if (activeLine >= 0 && activeLine !== i) {
@@ -794,6 +823,7 @@ function onLineFocus(i, caretOffset = null) {
   div.classList.add("editing");
   // 显示源码（清除零宽空格等占位符）
   div.textContent = lines[i].text || "";
+  ensureEditablePlaceholder(div);
   // 如果空行，确保有内容可编辑
   if (caretOffset !== null && caretOffset !== undefined) {
     setCaretOffset(div, caretOffset);
@@ -809,45 +839,9 @@ function commitLine(i) {
   // 全量重新计算代码块状态和 HTML
   recomputeAllCodeBlocks();
   div.classList.remove("editing");
-  div.classList.toggle("empty", lines[i].text.trim() === "");
-  div.dataset.inCode = lines[i].inCode ? "1" : "0";
-  div.innerHTML = lines[i].html || "";
+  refreshLineElement(i);
   // 更新所有行的 className 和 innerHTML（代码块状态可能变了）
-  for (let j = 0; j < editor.children.length; j++) {
-    const d = editor.children[j];
-    if (j === i) continue;
-    const wasEditing = d.classList.contains("editing");
-    if (wasEditing) continue;
-    d.className = "line" + (lines[j].text.trim() === "" ? " empty" : "") + (lines[j].inCode ? " code-line" : "");
-    d.dataset.inCode = lines[j].inCode ? "1" : "0";
-    d.innerHTML = lines[j].html || "";
-  }
-}
-
-// 重新计算从第 i 行开始的代码块状态
-function recomputeCodeBlocks(fromLine) {
-  let inCode = false;
-  for (let j = 0; j <= fromLine && j < lines.length; j++) {
-    if (isFenceLine(lines[j].text)) {
-      inCode = !inCode;
-    }
-  }
-  for (let i = fromLine; i < lines.length; i++) {
-    const isFence = isFenceLine(lines[i].text);
-    if (isFence) {
-      lines[i].inCode = false;
-      lines[i].html = renderLine(lines[i].text, false);
-      inCode = !inCode;
-    } else {
-      lines[i].inCode = inCode;
-      lines[i].html = renderLine(lines[i].text, inCode);
-    }
-  }
-}
-
-// ── 行失焦 ──（去掉 blur 依赖，改为主动触发）
-function onLineBlur(i) {
-  // 不做任何事，渲染由 onLineFocus/Enter/方向键 主动触发
+  refreshLineRange(0);
 }
 
 // ── 渲染当前行并切到目标行 ──
@@ -868,6 +862,9 @@ editor.addEventListener("keydown", (e) => {
   const target = e.target.closest(".line");
   if (!target) return;
   const i = parseInt(target.dataset.index);
+  if (e.key !== "ArrowUp" && e.key !== "ArrowDown") {
+    desiredCodeColumn = null;
+  }
 
   // Enter: 拆分新行，当前行立即渲染
   if (e.key === "Enter" && !e.shiftKey) {
@@ -885,23 +882,13 @@ editor.addEventListener("keydown", (e) => {
     recomputeAllCodeBlocks();
     // 更新当前行 DOM
     target.classList.remove("editing");
-    target.className = "line" + (before.trim() === "" ? " empty" : "") + (lines[i].inCode ? " code-line" : "");
-    target.innerHTML = lines[i].html || "";
+    refreshLineElement(i);
     // 更新后续行 DOM
-    for (let j = i + 1; j < editor.children.length; j++) {
-      editor.children[j].className = "line" + (lines[j].text.trim() === "" ? " empty" : "") + (lines[j].inCode ? " code-line" : "");
-      editor.children[j].dataset.inCode = lines[j].inCode ? "1" : "0";
-      editor.children[j].innerHTML = lines[j].html || "";
-    }
     // 创建新行 DOM
     const newDiv = createLineEl(i + 1);
     editor.insertBefore(newDiv, target.nextSibling);
     // 再次更新新行后面的行
-    for (let j = i + 2; j < editor.children.length; j++) {
-      editor.children[j].className = "line" + (lines[j].text.trim() === "" ? " empty" : "") + (lines[j].inCode ? " code-line" : "");
-      editor.children[j].dataset.inCode = lines[j].inCode ? "1" : "0";
-      editor.children[j].innerHTML = lines[j].html || "";
-    }
+    refreshLineRange(i + 2);
     refreshIndices();
     focusLine(i + 1, 0);
     saveContent();
@@ -914,10 +901,11 @@ editor.addEventListener("keydown", (e) => {
     if (isCodeNavLine(i) && i > 0 && isCodeNavLine(i - 1)) {
       e.preventDefault();
       lines[i].text = target.textContent;
+      desiredCodeColumn = desiredCodeColumn ?? offset;
       commitLine(i);
       activeLine = -1;
       saveContent();
-      focusLine(i - 1, Math.min(offset, lines[i - 1].text.length));
+      focusLine(i - 1, Math.min(desiredCodeColumn, lines[i - 1].text.length));
       return;
     }
     // 检查是否在第一行（多行内容时需要判断）
@@ -940,10 +928,11 @@ editor.addEventListener("keydown", (e) => {
     if (isCodeNavLine(i) && i < editor.children.length - 1 && isCodeNavLine(i + 1)) {
       e.preventDefault();
       lines[i].text = target.textContent;
+      desiredCodeColumn = desiredCodeColumn ?? offset;
       commitLine(i);
       activeLine = -1;
       saveContent();
-      focusLine(i + 1, Math.min(offset, lines[i + 1].text.length));
+      focusLine(i + 1, Math.min(desiredCodeColumn, lines[i + 1].text.length));
       return;
     }
     if (i < editor.children.length - 1 && offset >= text.length) {
