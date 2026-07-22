@@ -86,6 +86,9 @@ header h1 { font-size: 15px; font-weight: 600; }
 .folder-add { opacity: 0; font-size: 14px; color: var(--muted); cursor: pointer; }
 .folder-header:hover .folder-add { opacity: .7; }
 .folder-add:hover { opacity: 1; color: var(--accent); }
+.folder-del { opacity: 0; font-size: 13px; color: var(--muted); cursor: pointer; }
+.folder-header:hover .folder-del { opacity: .7; }
+.folder-del:hover { opacity: 1; color: #e55; }
 .folder-items { overflow: hidden; }
 .folder-items.collapsed { display: none; }
 
@@ -266,6 +269,7 @@ function renderDocList() {
         <span class="folder-arrow">▼</span>
         <span class="folder-name">${esc(folder)}</span>
         <span class="folder-count">${items.length}</span>
+        <span class="folder-del" onclick="event.stopPropagation();delFolder('${esc(folder)}')">🗑️</span>
       </div>
       <div class="folder-items ${collapsed ? "collapsed" : ""}">
         ${items.map(d => `
@@ -286,6 +290,18 @@ function toggleFolder(name) {
   if (expandedFolders[name] === false) delete expandedFolders[name];
   else expandedFolders[name] = false;
   renderDocList();
+}
+
+async function delFolder(name) {
+  const items = docs.filter(d => (d.folder || "默认") === name);
+  if (!items.length) { toast("文件夹为空"); return; }
+  if (!confirm(`确定删除文件夹「${name}」下的 ${items.length} 个文档？`)) return;
+  for (const d of items) {
+    await api("DELETE", "/docs/" + d.id);
+  }
+  if (items.some(d => d.id === currentDocId)) { currentDocId = null; newDoc(); }
+  await loadDocList();
+  toast("已删除 " + items.length + " 个文档");
 }
 
 function newFolder() {
