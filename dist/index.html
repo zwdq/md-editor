@@ -585,10 +585,10 @@ function toggleTheme() {
 function renderLine(text, inCodeBlock) {
   // 代码块内：原样显示
   if (inCodeBlock) {
-    return text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    return text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;") || "<br>";
   }
   let html = text;
-  if (!html.trim()) return "";
+  if (!html.trim()) return "<br>";
   html = html.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   // 行内代码先提取
   const codes = [];
@@ -660,7 +660,7 @@ function createLineEl(i) {
   div.dataset.inCode = lines[i].inCode ? "1" : "0";
   div.contentEditable = "true";
   div.spellcheck = false;
-  div.innerHTML = lines[i].html || "";
+  div.innerHTML = lines[i].html || "<br>";
 
   // focus: 显示源码（从 dataset 动态读索引，不用闭包）
   div.addEventListener("focus", function() {
@@ -690,11 +690,29 @@ function createLineEl(i) {
 // ── 全量渲染 ──
 function renderAll() {
   editor.innerHTML = "";
-  if (lines.length === 0) lines.push({ text: "", html: "" });
+  if (lines.length === 0) lines.push({ text: "", html: "", inCode: false });
+  // 先全量计算代码块状态
+  recomputeAllCodeBlocks();
   lines.forEach((_, i) => {
     editor.appendChild(createLineEl(i));
   });
   updateStatus();
+}
+
+// 全量重新计算所有行的代码块状态和 HTML
+function recomputeAllCodeBlocks() {
+  let inCode = false;
+  for (let i = 0; i < lines.length; i++) {
+    const isFence = /^```\w*$/.test(lines[i].text.trim());
+    if (isFence) {
+      lines[i].inCode = false;
+      lines[i].html = renderLine(lines[i].text, false);
+      inCode = !inCode;
+    } else {
+      lines[i].inCode = inCode;
+      lines[i].html = renderLine(lines[i].text, inCode);
+    }
+  }
 }
 
 // ── 行聚焦：换成源码 ──
@@ -707,12 +725,19 @@ function onLineFocus(i) {
   const div = editor.children[i];
   if (!div) return;
   div.classList.add("editing");
-  div.textContent = lines[i].text;
+  // 显示源码，空行也给个占位
+  div.textContent = lines[i].text || "";
   // 光标放末尾
   const sel = window.getSelection();
   const range = document.createRange();
-  range.selectNodeContents(div);
-  range.collapse(false);
+  if (div.firstChild) {
+    range.selectNodeContents(div);
+    range.collapse(false);
+  } else {
+    // 空行，光标放在 div 开头
+    range.setStart(div, 0);
+    range.collapse(true);
+  }
   sel.removeAllRanges();
   sel.addRange(range);
 }
@@ -721,13 +746,20 @@ function onLineFocus(i) {
 function commitLine(i) {
   const div = editor.children[i];
   if (!div) return;
-  // 从内存读取（input 事件已实时保存）
-  const text = lines[i].text;
-  // 重新计算代码块状态（当前行及后续行）
-  recomputeCodeBlocks(i);
+  // 全量重新计算代码块状态和 HTML
+  recomputeAllCodeBlocks();
   div.classList.remove("editing");
-  div.classList.toggle("empty", text.trim() === "");
-  div.innerHTML = lines[i].html || "";
+  div.classList.toggle("empty", lines[i].text.trim() === "");
+  div.innerHTML = lines[i].html || "<br>";
+  // 更新所有行的 className 和 innerHTML（代码块状态可能变了）
+  for (let j = 0; j < editor.children.length; j++) {
+    const d = editor.children[j];
+    if (j === i) continue;
+    const wasEditing = d.classList.contains("editing");
+    if (wasEditing) continue;
+    d.className = "line" + (lines[j].text.trim() === "" ? " empty" : "") + (lines[j].inCode ? " code-line" : "");
+    d.innerHTML = lines[j].html || "<br>";
+  }
 }
 
 // 重新计算从第 i 行开始的代码块状态
@@ -778,28 +810,33 @@ editor.addEventListener("keydown", (e) => {
   // Enter: 拆分新行，当前行立即渲染
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
-    // 从内存读源码（input 事件已实时保存），不从 DOM 读
     const fullText = lines[i].text;
     const offset = getCaretOffset(target);
     const before = fullText.slice(0, offset);
     const after = fullText.slice(offset);
 
-    // 提交当前行（渲染）
+    // 更新当前行
     lines[i].text = before;
-    lines[i].html = renderLine(before);
-    target.classList.remove("editing");
-    target.classList.toggle("empty", before.trim() === "");
-    target.innerHTML = lines[i].html || "";
-
     // 插入新行
     lines.splice(i + 1, 0, { text: after, html: "", inCode: false });
-    recomputeCodeBlocks(i + 1);
+    // 全量重新计算代码块状态
+    recomputeAllCodeBlocks();
+    // 更新当前行 DOM
+    target.classList.remove("editing");
+    target.className = "line" + (before.trim() === "" ? " empty" : "") + (lines[i].inCode ? " code-line" : "");
+    target.innerHTML = lines[i].html || "<br>";
+    // 更新后续行 DOM
+    for (let j = i + 1; j < editor.children.length; j++) {
+      editor.children[j].className = "line" + (lines[j].text.trim() === "" ? " empty" : "") + (lines[j].inCode ? " code-line" : "");
+      editor.children[j].innerHTML = lines[j].html || "<br>";
+    }
+    // 创建新行 DOM
     const newDiv = createLineEl(i + 1);
     editor.insertBefore(newDiv, target.nextSibling);
-    // 更新后续行的 DOM（代码块状态可能变了）
+    // 再次更新新行后面的行
     for (let j = i + 2; j < editor.children.length; j++) {
       editor.children[j].className = "line" + (lines[j].text.trim() === "" ? " empty" : "") + (lines[j].inCode ? " code-line" : "");
-      editor.children[j].innerHTML = lines[j].html || "";
+      editor.children[j].innerHTML = lines[j].html || "<br>";
     }
     refreshIndices();
     newDiv.focus();
@@ -836,13 +873,14 @@ editor.addEventListener("keydown", (e) => {
     const offset = getCaretOffset(target);
     if (offset === 0 && i > 0) {
       e.preventDefault();
-      const curText = lines[i].text;  // 从内存读
-      const prevText = lines[i - 1].text;  // 从内存读
+      const curText = lines[i].text;
+      const prevText = lines[i - 1].text;
       const mergeText = prevText + curText;
 
       lines[i - 1].text = mergeText;
-      lines[i - 1].html = renderLine(mergeText);
       lines.splice(i, 1);
+      // 全量重新计算
+      recomputeAllCodeBlocks();
       renderAll();
 
       const newPrev = editor.children[i - 1];
