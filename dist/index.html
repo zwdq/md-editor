@@ -27,24 +27,20 @@ header h1 { font-size: 15px; font-weight: 600; }
 .btn.icon { padding: 5px 8px; font-size: 15px; }
 
 .editor-scroll { flex: 1; overflow-y: auto; }
-.editor-area { max-width: 760px; margin: 0 auto; padding: 32px 32px 120px; outline: none; min-height: 100%; font-size: 16px; line-height: 1.8; }
+.editor-area { max-width: 760px; margin: 0 auto; padding: 32px 32px 120px; outline: none; min-height: 100%; }
 .editor-area:focus { outline: none; }
 
-/* 每行 */
-.line { position: relative; min-height: 1.8em; padding: 0 8px; margin: 0 -8px; border-radius: 4px; transition: background .08s; }
+.line { position: relative; min-height: 1.8em; padding: 1px 8px; margin: 0 -8px; border-radius: 4px; transition: background .08s; font-size: 16px; line-height: 1.8; }
 .line:hover { background: var(--accent-soft); }
-.line .raw { display: none; font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; font-size: 14px; white-space: pre-wrap; word-break: break-word; color: var(--text); }
-.line .rendered { display: block; cursor: text; }
-.line.editing .raw { display: block; }
-.line.editing .rendered { display: none; }
-.line.empty .rendered::before { content: "​"; }
+.line:focus { outline: none; background: var(--bg-secondary); }
+.line.empty::before { content: ""; }
 
 /* Markdown 渲染 */
-.line h1 { font-size: 1.8em; font-weight: 700; border-bottom: 1px solid var(--border); padding-bottom: 0.2em; margin: 0.3em 0; line-height: 1.3; }
-.line h2 { font-size: 1.4em; font-weight: 700; border-bottom: 1px solid var(--border); padding-bottom: 0.2em; margin: 0.3em 0; line-height: 1.3; }
-.line h3 { font-size: 1.2em; font-weight: 700; margin: 0.3em 0; }
-.line h4 { font-size: 1em; font-weight: 700; margin: 0.3em 0; }
-.line h5, .line h6 { font-weight: 700; margin: 0.3em 0; }
+.line h1 { font-size: 1.8em; font-weight: 700; border-bottom: 1px solid var(--border); padding-bottom: 0.2em; margin: 0.2em 0; line-height: 1.3; }
+.line h2 { font-size: 1.4em; font-weight: 700; border-bottom: 1px solid var(--border); padding-bottom: 0.2em; margin: 0.2em 0; line-height: 1.3; }
+.line h3 { font-size: 1.2em; font-weight: 700; margin: 0.2em 0; }
+.line h4 { font-size: 1em; font-weight: 700; margin: 0.2em 0; }
+.line h5, .line h6 { font-weight: 700; margin: 0.2em 0; }
 .line p { margin: 0; }
 .line a { color: var(--accent); }
 .line strong { font-weight: 700; }
@@ -52,7 +48,7 @@ header h1 { font-size: 15px; font-weight: 600; }
 .line del { color: var(--muted); }
 .line code { font-family: "JetBrains Mono", monospace; font-size: 0.88em; background: var(--code-bg); padding: 2px 6px; border-radius: 4px; }
 .line pre { background: var(--code-bg); border-radius: 8px; padding: 14px; overflow-x: auto; border: 1px solid var(--border); }
-.line pre code { background: transparent; padding: 0; font-size: 14px; line-height: 1.6; }
+.line pre code { background: transparent; padding: 0; font-size: 14px; }
 .line blockquote { border-left: 4px solid var(--accent); padding: 2px 16px; color: var(--muted); background: var(--accent-soft); border-radius: 0 8px 8px 0; }
 .line ul, .line ol { margin: 0; padding-left: 1.6em; }
 .line li { margin: 0.1em 0; }
@@ -63,11 +59,7 @@ header h1 { font-size: 15px; font-weight: 600; }
 .line hr { border: 0; border-top: 1px solid var(--border); }
 .line .checkbox { list-style: none; margin-left: -1.2em; }
 .line .checkbox input { margin-right: 6px; }
-
-/* 代码块多行 */
-.line.code-block { background: var(--code-bg); border-radius: 8px; border: 1px solid var(--border); margin: 4px -8px; }
-.line.code-block .raw { font-size: 14px; color: var(--text); padding: 4px 8px; }
-.line.code-block .rendered pre { background: transparent; border: 0; padding: 4px 8px; }
+.line.editing { font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; font-size: 14px; white-space: pre-wrap; word-break: break-word; }
 
 .statusbar { height: 28px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--muted); background: var(--card); border-top: 1px solid var(--border); flex-shrink: 0; }
 .layout { display: flex; flex-direction: column; height: 100vh; }
@@ -88,18 +80,18 @@ header h1 { font-size: 15px; font-weight: 600; }
     </div>
   </header>
   <div class="editor-scroll" id="scroll">
-    <div class="editor-area" id="editor" contenteditable="true" spellcheck="false"></div>
+    <div class="editor-area" id="editor"></div>
   </div>
   <div class="statusbar">
     <span id="charCount">0 字 · 0 行</span>
-    <span>Typora 风格 · 按行实时渲染</span>
+    <span>Typora 风格 · 点击编辑 · 失焦渲染</span>
   </div>
 </div>
 
 <script>
 const editor = document.getElementById("editor");
 const scroll = document.getElementById("scroll");
-let lines = []; // [{text: "原始文本", rendered: "HTML"}]
+let lines = []; // [{text: "markdown源码", html: "渲染HTML"}]
 let activeLine = -1;
 
 // ── 主题 ──
@@ -116,42 +108,35 @@ function toggleTheme() {
 function renderLine(text) {
   let html = text;
   if (!html.trim()) return "";
-  // 转义
   html = html.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   // 行内代码先提取
   const codes = [];
   html = html.replace(/`([^`]+)`/g, (m, c) => { codes.push(c); return `\x00${codes.length-1}\x00`; });
   // 标题
-  if (/^######\s/.test(html)) html = html.replace(/^######\s+/, "") ? `<h6>${html.replace(/^######\s+/, "")}</h6>` : "";
+  if (/^######\s/.test(html)) html = `<h6>${html.replace(/^######\s+/, "")}</h6>`;
   else if (/^#####\s/.test(html)) html = `<h5>${html.replace(/^#####\s+/, "")}</h5>`;
   else if (/^####\s/.test(html)) html = `<h4>${html.replace(/^####\s+/, "")}</h4>`;
   else if (/^###\s/.test(html)) html = `<h3>${html.replace(/^###\s+/, "")}</h3>`;
   else if (/^##\s/.test(html)) html = `<h2>${html.replace(/^##\s+/, "")}</h2>`;
   else if (/^#\s/.test(html)) html = `<h1>${html.replace(/^#\s+/, "")}</h1>`;
-  // 水平线
   else if (/^---+$/.test(html.trim())) html = "<hr>";
-  // 引用
   else if (/^&gt;\s?/.test(html)) html = `<blockquote><p>${html.replace(/^&gt;\s?/, "")}</p></blockquote>`;
-  // 任务列表
   else if (/^-\s\[(x|X|\s)\]\s/.test(html)) {
     const checked = /\[x|X\]/.test(html) ? "checked" : "";
-    const text2 = html.replace(/^-\s\[(x|X|\s)\]\s/, "");
-    html = `<ul><li class="checkbox"><input type="checkbox" ${checked} disabled> ${text2}</li></ul>`;
+    const t2 = html.replace(/^-\s\[(x|X|\s)\]\s/, "");
+    html = `<ul><li class="checkbox"><input type="checkbox" ${checked} disabled> ${t2}</li></ul>`;
   }
-  // 无序列表
   else if (/^[-*+]\s+/.test(html)) html = `<ul><li>${html.replace(/^[-*+]\s+/, "")}</li></ul>`;
-  // 有序列表
   else if (/^\d+\.\s+/.test(html)) html = `<ol><li>${html.replace(/^\d+\.\s+/, "")}</li></ol>`;
-  // 表格行（简化）
   else if (/^\|.*\|$/.test(html.trim())) {
     const cells = html.trim().split("|").map(s => s.trim()).filter(s => s !== "");
-    if (/^[-:\s]+$/.test(cells.join(""))) html = ""; // 分隔行隐藏
+    if (/^[-:\s]+$/.test(cells.join(""))) html = "";
     else html = `<table><tr>${cells.map(c => `<td>${c}</td>`).join("")}</tr></table>`;
   }
   else html = `<p>${html}</p>`;
   // 还原行内代码
   html = html.replace(/\x00(\d+)\x00/g, (m, i) => `<code>${codes[parseInt(i)]}</code>`);
-  // 粗体斜体删除线（在标签内也处理）
+  // 粗体斜体删除线
   html = html.replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>");
   html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
@@ -162,180 +147,154 @@ function renderLine(text) {
   return html;
 }
 
-// ── 代码块判断 ──
-function isCodeBlock(text, prevLines) {
-  return text.trim().startsWith("```") || (prevLines && prevLines.some(l => l.trim().startsWith("```")) && prevLines.filter(l => l.trim().startsWith("```")).length % 2 === 1);
-}
-
 // ── 初始化行 ──
 function initLines(text) {
-  lines = text.split("\n").map(t => ({ text: t, rendered: renderLine(t) }));
+  lines = text.split("\n").map(t => ({ text: t, html: renderLine(t) }));
+  if (lines.length === 0) lines.push({ text: "", html: "" });
 }
 
-// ── 全量渲染 DOM ──
-function renderAll() {
-  editor.innerHTML = "";
-  lines.forEach((line, i) => {
-    const div = createLineEl(i);
-    editor.appendChild(div);
-  });
-  if (lines.length === 0) {
-    lines.push({ text: "", rendered: "" });
-    editor.appendChild(createLineEl(0));
-  }
-  updateStatus();
-}
-
+// ── 创建行元素 ──
 function createLineEl(i) {
   const div = document.createElement("div");
   div.className = "line" + (lines[i].text.trim() === "" ? " empty" : "");
   div.dataset.index = i;
   div.contentEditable = "true";
   div.spellcheck = false;
+  div.innerHTML = lines[i].html || "";
 
-  const rendered = document.createElement("div");
-  rendered.className = "rendered";
-  rendered.innerHTML = lines[i].rendered || "";
+  // focus: 显示源码
+  div.addEventListener("focus", function() {
+    onLineFocus(i);
+  });
 
-  const raw = document.createElement("div");
-  raw.className = "raw";
-  raw.textContent = lines[i].text;
-
-  div.appendChild(rendered);
-  div.appendChild(raw);
-
-  // 事件
-  div.addEventListener("focus", () => onLineFocus(i), true);
-  div.addEventListener("blur", () => onLineBlur(i), true);
-  div.addEventListener("input", () => onLineInput(i, div));
+  // blur: 渲染
+  div.addEventListener("blur", function() {
+    onLineBlur(i);
+  });
 
   return div;
 }
 
-// ── 行聚焦：显示源码 ──
+// ── 全量渲染 ──
+function renderAll() {
+  editor.innerHTML = "";
+  if (lines.length === 0) lines.push({ text: "", html: "" });
+  lines.forEach((_, i) => {
+    editor.appendChild(createLineEl(i));
+  });
+  updateStatus();
+}
+
+// ── 行聚焦：换成源码 ──
 function onLineFocus(i) {
   // 先渲染上一行
   if (activeLine >= 0 && activeLine !== i) {
-    renderLineEl(activeLine);
+    commitLine(activeLine);
   }
   activeLine = i;
   const div = editor.children[i];
   if (!div) return;
   div.classList.add("editing");
-  const raw = div.querySelector(".raw");
-  raw.textContent = lines[i].text;
+  div.textContent = lines[i].text;
   // 光标放末尾
-  setTimeout(() => {
-    const sel = window.getSelection();
-    const range = document.createRange();
-    if (raw.childNodes.length === 0) {
-      raw.appendChild(document.createTextNode(""));
-    }
-    range.selectNodeContents(raw);
-    range.collapse(false);
-    sel.removeAllRanges();
-    sel.addRange(range);
-  }, 0);
+  const sel = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(div);
+  range.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(range);
 }
 
-// ── 渲染某行为富文本 ──
-function renderLineEl(i) {
+// ── 提交行：换成渲染 ──
+function commitLine(i) {
   const div = editor.children[i];
   if (!div) return;
-  const raw = div.querySelector(".raw");
-  const text = raw.textContent;
+  const text = div.textContent;
   lines[i].text = text;
-  lines[i].rendered = renderLine(text);
+  lines[i].html = renderLine(text);
   div.classList.remove("editing");
   div.classList.toggle("empty", text.trim() === "");
-  const rendered = div.querySelector(".rendered");
-  if (rendered) rendered.innerHTML = lines[i].rendered || "";
-  saveContent();
+  div.innerHTML = lines[i].html || "";
 }
 
-// ── 行失焦：渲染 ──
+// ── 行失焦 ──
 function onLineBlur(i) {
-  // 用 setTimeout 确保焦点真正离开了
   setTimeout(() => {
-    // 检查焦点是否还在编辑器内
     const focused = document.activeElement;
     const focusedLine = focused?.closest?.(".line");
-    if (!focusedLine || focusedLine.dataset.index !== String(i)) {
+    if (!focusedLine || parseInt(focusedLine.dataset.index) !== i) {
       if (activeLine === i) {
-        renderLineEl(i);
+        commitLine(i);
         activeLine = -1;
+        saveContent();
       }
     }
-  }, 10);
-}
-
-// ── 行输入：实时更新源码 ──
-function onLineInput(i, div) {
-  const raw = div.querySelector(".raw");
-  lines[i].text = raw.textContent;
-  // 不立即渲染，等失焦
-  updateStatus();
+  }, 50);
 }
 
 // ── 键盘处理 ──
 editor.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey && activeLine >= 0) {
+  const target = e.target.closest(".line");
+  if (!target) return;
+  const i = parseInt(target.dataset.index);
+
+  // Enter: 拆分新行
+  if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
-    const i = activeLine;
-    const div = editor.children[i];
-    const raw = div.querySelector(".raw");
-    const text = raw.textContent;
-    // 找光标位置拆分
     const sel = window.getSelection();
-    const offset = sel.anchorOffset;
-    const before = text.slice(0, offset);
-    const after = text.slice(offset);
+    const range = sel.getRangeAt(0);
+    const offset = getCaretOffset(target);
 
+    const before = target.textContent.slice(0, offset);
+    const after = target.textContent.slice(offset);
+
+    // 提交当前行
     lines[i].text = before;
-    lines[i].rendered = renderLine(before);
-    div.querySelector(".rendered").innerHTML = lines[i].rendered || "";
-    div.classList.remove("editing");
-    div.classList.toggle("empty", before.trim() === "");
-    raw.textContent = before;
-    // 插入新行
-    const newText = after;
-    lines.splice(i + 1, 0, { text: newText, rendered: renderLine(newText) });
-    const newDiv = createLineEl(i + 1);
-    editor.insertBefore(newDiv, div.nextSibling);
+    lines[i].html = renderLine(before);
+    target.classList.remove("editing");
+    target.classList.toggle("empty", before.trim() === "");
+    target.innerHTML = lines[i].html || "";
 
-    // 更新所有 index
+    // 插入新行
+    lines.splice(i + 1, 0, { text: after, html: renderLine(after) });
+    const newDiv = createLineEl(i + 1);
+    editor.insertBefore(newDiv, target.nextSibling);
     refreshIndices();
-    // 聚焦新行
     newDiv.focus();
     saveContent();
   }
 
-  if (e.key === "Backspace" && activeLine >= 0) {
-    const i = activeLine;
-    const div = editor.children[i];
-    const raw = div.querySelector(".raw");
-    const sel = window.getSelection();
-    if (sel.anchorOffset === 0 && i > 0) {
+  // Backspace: 行首合并
+  if (e.key === "Backspace") {
+    const offset = getCaretOffset(target);
+    if (offset === 0 && i > 0) {
       e.preventDefault();
-      // 合并到上一行
-      const prevText = lines[i-1].text;
-      const curText = raw.textContent;
-      lines[i-1].text = prevText + curText;
-      lines[i-1].rendered = renderLine(lines[i-1].text);
+      const curText = target.textContent;
+      const prevDiv = editor.children[i - 1];
+      const prevText = lines[i - 1].text;
+      const mergeText = prevText + curText;
+
+      lines[i - 1].text = mergeText;
+      lines[i - 1].html = renderLine(mergeText);
       lines.splice(i, 1);
       renderAll();
+
       // 聚焦上一行，光标在合并处
-      const prevDiv = editor.children[i-1];
-      prevDiv.focus();
+      const newPrev = editor.children[i - 1];
+      newPrev.focus();
       setTimeout(() => {
+        newPrev.classList.add("editing");
+        newPrev.textContent = mergeText;
         const r = document.createRange();
-        const rawEl = prevDiv.querySelector(".raw");
-        r.setStart(rawEl.firstChild || rawEl, prevText.length);
-        r.collapse(true);
-        const s = window.getSelection();
-        s.removeAllRanges();
-        s.addRange(r);
+        const sel = window.getSelection();
+        if (newPrev.firstChild) {
+          r.setStart(newPrev.firstChild, prevText.length);
+          r.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(r);
+        }
       }, 0);
+      activeLine = i - 1;
       saveContent();
     }
   }
@@ -347,7 +306,18 @@ editor.addEventListener("keydown", (e) => {
   }
 });
 
-// ── 粘贴处理 ──
+// 获取光标在元素中的字符偏移
+function getCaretOffset(el) {
+  const sel = window.getSelection();
+  if (sel.rangeCount === 0) return 0;
+  const range = sel.getRangeAt(0);
+  const preRange = range.cloneRange();
+  preRange.selectNodeContents(el);
+  preRange.setEnd(range.endContainer, range.endOffset);
+  return preRange.toString().length;
+}
+
+// 粘贴纯文本
 editor.addEventListener("paste", (e) => {
   e.preventDefault();
   const text = (e.clipboardData || window.clipboardData).getData("text");
@@ -386,21 +356,17 @@ function downloadMD() {
 function uploadFile(event) {
   const file = event.target.files[0];
   if (!file) return;
-  file.text().then(text => {
-    initLines(text);
-    renderAll();
-    saveContent();
-  });
+  file.text().then(text => { initLines(text); renderAll(); saveContent(); });
   event.target.value = "";
 }
 
 function copyHTML() {
-  const html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><style>body{font-family:sans-serif;max-width:760px;margin:40px auto;padding:0 20px;line-height:1.8;}pre{background:#f5f5f5;padding:16px;border-radius:8px;overflow-x:auto;}code{background:#f5f5f5;padding:2px 6px;border-radius:4px;}blockquote{border-left:4px solid #30CF79;padding-left:16px;color:#666;margin-left:0;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #ddd;padding:8px 12px;}img{max-width:100%;}</style></head><body>" + lines.map(l => l.rendered).join("\n") + "</body></html>";
-  navigator.clipboard.writeText(html).then(() => alert("HTML 已复制到剪贴板"));
+  const html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><style>body{font-family:sans-serif;max-width:760px;margin:40px auto;padding:0 20px;line-height:1.8;}pre{background:#f5f5f5;padding:16px;border-radius:8px;}code{background:#f5f5f5;padding:2px 6px;border-radius:4px;}blockquote{border-left:4px solid #30CF79;padding-left:16px;color:#666;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #ddd;padding:8px;}img{max-width:100%;}</style></head><body>" + lines.map(l => l.html).join("\n") + "</body></html>";
+  navigator.clipboard.writeText(html).then(() => alert("HTML 已复制"));
 }
 
 function insertTemplate() {
-  const template = `# 欢迎使用 Markdown 编辑器
+  const tpl = `# 欢迎使用 Markdown 编辑器
 
 这是一段**粗体**和*斜体*文字，还有~~删除线~~。
 
@@ -440,7 +406,7 @@ function insertTemplate() {
 ---
 
 点击任意行开始编辑，Enter 换行，失焦自动渲染。`;
-  initLines(template);
+  initLines(tpl);
   renderAll();
   saveContent();
 }
