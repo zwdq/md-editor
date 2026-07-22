@@ -214,17 +214,23 @@ function createLineEl(i) {
 
 // ── 行聚焦：显示源码 ──
 function onLineFocus(i) {
+  // 先渲染上一行
+  if (activeLine >= 0 && activeLine !== i) {
+    renderLineEl(activeLine);
+  }
   activeLine = i;
   const div = editor.children[i];
   if (!div) return;
   div.classList.add("editing");
-  // 把 raw 内容放进可编辑区
   const raw = div.querySelector(".raw");
   raw.textContent = lines[i].text;
   // 光标放末尾
   setTimeout(() => {
     const sel = window.getSelection();
     const range = document.createRange();
+    if (raw.childNodes.length === 0) {
+      raw.appendChild(document.createTextNode(""));
+    }
     range.selectNodeContents(raw);
     range.collapse(false);
     sel.removeAllRanges();
@@ -232,8 +238,8 @@ function onLineFocus(i) {
   }, 0);
 }
 
-// ── 行失焦：渲染 ──
-function onLineBlur(i) {
+// ── 渲染某行为富文本 ──
+function renderLineEl(i) {
   const div = editor.children[i];
   if (!div) return;
   const raw = div.querySelector(".raw");
@@ -242,9 +248,25 @@ function onLineBlur(i) {
   lines[i].rendered = renderLine(text);
   div.classList.remove("editing");
   div.classList.toggle("empty", text.trim() === "");
-  div.querySelector(".rendered").innerHTML = lines[i].rendered || "";
-  activeLine = -1;
+  const rendered = div.querySelector(".rendered");
+  if (rendered) rendered.innerHTML = lines[i].rendered || "";
   saveContent();
+}
+
+// ── 行失焦：渲染 ──
+function onLineBlur(i) {
+  // 用 setTimeout 确保焦点真正离开了
+  setTimeout(() => {
+    // 检查焦点是否还在编辑器内
+    const focused = document.activeElement;
+    const focusedLine = focused?.closest?.(".line");
+    if (!focusedLine || focusedLine.dataset.index !== String(i)) {
+      if (activeLine === i) {
+        renderLineEl(i);
+        activeLine = -1;
+      }
+    }
+  }, 10);
 }
 
 // ── 行输入：实时更新源码 ──
@@ -275,7 +297,6 @@ editor.addEventListener("keydown", (e) => {
     div.classList.remove("editing");
     div.classList.toggle("empty", before.trim() === "");
     raw.textContent = before;
-
     // 插入新行
     const newText = after;
     lines.splice(i + 1, 0, { text: newText, rendered: renderLine(newText) });
