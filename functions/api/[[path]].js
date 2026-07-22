@@ -36,9 +36,9 @@ export async function onRequest(context) {
   if (!checkAuth(request, env)) return json({ success: false, error: "未授权" }, 401);
 
   try {
-    // GET /api/docs — 文档列表
+    // GET /api/docs — 文档列表（含 folder）
     if (path === "/docs" && request.method === "GET") {
-      const result = await env.DB.prepare("SELECT id, title, created_at, updated_at FROM documents ORDER BY updated_at DESC").all();
+      const result = await env.DB.prepare("SELECT id, title, folder, created_at, updated_at FROM documents ORDER BY folder ASC, updated_at DESC").all();
       return json({ success: true, data: result.results });
     }
 
@@ -47,28 +47,30 @@ export async function onRequest(context) {
       const body = await request.json();
       const title = body.title || "无标题";
       const content = body.content || "";
+      const folder = body.folder || "默认";
       const result = await env.DB.prepare(
-        "INSERT INTO documents (title, content) VALUES (?, ?)"
-      ).bind(title, content).run();
+        "INSERT INTO documents (title, content, folder) VALUES (?, ?, ?)"
+      ).bind(title, content, folder).run();
       return json({ success: true, data: { id: result.meta.last_row_id } });
     }
 
     const match = path.match(/^\/docs\/(\d+)$/);
 
-    // GET /api/docs/:id — 获取单个文档
+    // GET /api/docs/:id
     if (match && request.method === "GET") {
       const doc = await env.DB.prepare("SELECT * FROM documents WHERE id = ?").bind(parseInt(match[1])).first();
       if (!doc) return json({ success: false, error: "文档不存在" }, 404);
       return json({ success: true, data: doc });
     }
 
-    // PUT /api/docs/:id — 更新文档
+    // PUT /api/docs/:id
     if (match && request.method === "PUT") {
       const body = await request.json();
       const fields = [];
       const binds = [];
       if (body.title !== undefined) { fields.push("title = ?"); binds.push(body.title); }
       if (body.content !== undefined) { fields.push("content = ?"); binds.push(body.content); }
+      if (body.folder !== undefined) { fields.push("folder = ?"); binds.push(body.folder); }
       if (!fields.length) return json({ success: false, error: "没有要更新的字段" }, 400);
       fields.push("updated_at = datetime('now')");
       binds.push(parseInt(match[1]));
@@ -76,13 +78,13 @@ export async function onRequest(context) {
       return json({ success: true });
     }
 
-    // DELETE /api/docs/:id — 删除文档
+    // DELETE /api/docs/:id
     if (match && request.method === "DELETE") {
       await env.DB.prepare("DELETE FROM documents WHERE id = ?").bind(parseInt(match[1])).run();
       return json({ success: true });
     }
 
-    // POST /api/docs/import — 批量导入
+    // POST /api/docs/import
     if (path === "/docs/import" && request.method === "POST") {
       const body = await request.json();
       if (!Array.isArray(body)) return json({ success: false, error: "需要文档数组" }, 400);
@@ -90,15 +92,16 @@ export async function onRequest(context) {
       for (const doc of body) {
         if (!doc.content) continue;
         const title = doc.title || doc.content.split("\n")[0].replace(/^#+\s*/, "").slice(0, 50) || "无标题";
-        await env.DB.prepare("INSERT INTO documents (title, content) VALUES (?, ?)").bind(title, doc.content).run();
+        const folder = doc.folder || "默认";
+        await env.DB.prepare("INSERT INTO documents (title, content, folder) VALUES (?, ?, ?)").bind(title, doc.content, folder).run();
         imported++;
       }
       return json({ success: true, imported });
     }
 
-    // GET /api/docs/export — 导出全部
+    // GET /api/docs/export
     if (path === "/docs/export" && request.method === "GET") {
-      const result = await env.DB.prepare("SELECT * FROM documents ORDER BY updated_at DESC").all();
+      const result = await env.DB.prepare("SELECT * FROM documents ORDER BY folder ASC, updated_at DESC").all();
       return json({ success: true, data: result.results });
     }
 

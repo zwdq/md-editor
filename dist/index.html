@@ -70,18 +70,53 @@ header h1 { font-size: 15px; font-weight: 600; }
 .main-layout { display: flex; flex: 1; overflow: hidden; }
 
 /* 侧栏 */
-.sidebar { width: 240px; background: var(--card); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
-.sidebar-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); }
-.sidebar-header h2 { font-size: 14px; }
-.sidebar-list { flex: 1; overflow-y: auto; padding: 8px; }
-.doc-item { padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--muted); transition: .12s; margin-bottom: 4px; }
+.sidebar { width: 260px; background: var(--card); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+.sidebar-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.sidebar-header h2 { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+.sidebar-list { flex: 1; overflow-y: auto; padding: 6px 8px; }
+
+/* 文件夹 */
+.folder-group { margin-bottom: 4px; }
+.folder-header { display: flex; align-items: center; gap: 4px; padding: 6px 8px; cursor: pointer; border-radius: 6px; font-size: 12px; font-weight: 600; color: var(--text); transition: .12s; user-select: none; }
+.folder-header:hover { background: var(--bg-secondary); }
+.folder-arrow { font-size: 10px; transition: transform .15s; color: var(--muted); width: 12px; text-align: center; }
+.folder-header.collapsed .folder-arrow { transform: rotate(-90deg); }
+.folder-name { flex: 1; }
+.folder-count { font-size: 11px; color: var(--muted); font-weight: 400; }
+.folder-add { opacity: 0; font-size: 14px; color: var(--muted); cursor: pointer; }
+.folder-header:hover .folder-add { opacity: .7; }
+.folder-add:hover { opacity: 1; color: var(--accent); }
+.folder-items { overflow: hidden; }
+.folder-items.collapsed { display: none; }
+
+.doc-item { padding: 7px 12px 7px 28px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--muted); transition: .12s; margin-bottom: 2px; position: relative; }
 .doc-item:hover { background: var(--bg-secondary); color: var(--text); }
 .doc-item.active { background: var(--accent-soft); color: var(--accent); }
 .doc-item .doc-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.doc-item .doc-time { font-size: 11px; opacity: .6; margin-top: 2px; }
-.doc-item .doc-del { float: right; opacity: 0; font-size: 12px; }
-.doc-item:hover .doc-del { opacity: 1; }
-.sidebar-footer { padding: 8px; border-top: 1px solid var(--border); display: flex; gap: 4px; }
+.doc-item .doc-time { font-size: 10px; opacity: .5; margin-top: 1px; }
+.doc-item .doc-del { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); opacity: 0; font-size: 11px; }
+.doc-item:hover .doc-del { opacity: .6; }
+.doc-item .doc-del:hover { opacity: 1; color: #e55; }
+
+.sidebar-footer { padding: 6px 8px; border-top: 1px solid var(--border); display: flex; gap: 4px; }
+.sidebar-footer .btn { flex: 1; text-align: center; }
+
+/* 下拉菜单 */
+.dropdown { position: relative; }
+.dropdown-menu { position: absolute; top: calc(100% + 4px); right: 0; min-width: 160px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.15); padding: 4px; display: none; z-index: 100; }
+.dropdown-menu.show { display: block; }
+.dropdown-menu .menu-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--text); transition: .12s; }
+.dropdown-menu .menu-item:hover { background: var(--accent-soft); color: var(--accent); }
+.dropdown-menu .menu-item .menu-icon { font-size: 15px; width: 18px; text-align: center; }
+.dropdown-menu .menu-sep { height: 1px; background: var(--border); margin: 4px 0; }
+
+/* 新建闪烁 */
+@keyframes flash-new { 0% { background: var(--accent-soft); } 100% { background: transparent; } }
+.doc-item.flash { animation: flash-new 1s ease-out; }
+
+/* Toast */
+.toast { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--text); color: var(--bg); padding: 8px 20px; border-radius: 20px; font-size: 13px; font-weight: 500; opacity: 0; transition: .25s; z-index: 200; pointer-events: none; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 /* 登录 */
 .login-wrap { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
@@ -109,24 +144,32 @@ header h1 { font-size: 15px; font-weight: 600; }
   <header>
     <h1>✏️ Markdown</h1>
     <div class="header-right">
-      <button class="btn" onclick="newDoc()">新建</button>
-      <button class="btn" onclick="saveDoc()">保存</button>
-      <button class="btn" onclick="insertTemplate()">模板</button>
-      <button class="btn" onclick="downloadMD()">下载</button>
-      <button class="btn" onclick="document.getElementById('uploadFile').click()">导入文件</button>
-      <input type="file" id="uploadFile" accept=".md,.txt,.markdown" style="display:none" onchange="uploadFile(event)">
-      <button class="btn" onclick="exportAll()">导出全部</button>
-      <button class="btn" onclick="copyHTML()">复制HTML</button>
-      <button class="btn icon" id="themeToggle" onclick="toggleTheme()">🌙</button>
-      <button class="btn" onclick="logout()">退出</button>
+      <button class="btn" onclick="saveDoc()" id="saveBtn">💾 保存</button>
+      <div class="dropdown">
+        <button class="btn icon" onclick="toggleDropdown(event)">⋯</button>
+        <div class="dropdown-menu" id="ddMenu">
+          <div class="menu-item" onclick="insertTemplate();closeDropdown()"><span class="menu-icon">📋</span> 插入模板</div>
+          <div class="menu-item" onclick="downloadMD();closeDropdown()"><span class="menu-icon">⬇️</span> 下载 MD</div>
+          <div class="menu-item" onclick="document.getElementById('uploadFile').click();closeDropdown()"><span class="menu-icon">📤</span> 导入文件</div>
+          <div class="menu-item" onclick="exportAll();closeDropdown()"><span class="menu-icon">📦</span> 导出全部</div>
+          <div class="menu-item" onclick="copyHTML();closeDropdown()"><span class="menu-icon">📄</span> 复制 HTML</div>
+          <div class="menu-sep"></div>
+          <div class="menu-item" onclick="toggleTheme();closeDropdown()"><span class="menu-icon" id="themeIcon">🌙</span> 切换主题</div>
+          <div class="menu-item" onclick="logout();closeDropdown()"><span class="menu-icon">🚪</span> 退出</div>
+        </div>
+      </div>
+      <input type="file" id="uploadFile" accept=".md,.txt,.markdown,.json" style="display:none" onchange="uploadFile(event)">
     </div>
   </header>
   <div class="main-layout">
     <aside class="sidebar">
-      <div class="sidebar-header"><h2>📄 文档</h2></div>
+      <div class="sidebar-header">
+        <h2>📄 文档</h2>
+      </div>
       <div class="sidebar-list" id="docList"></div>
       <div class="sidebar-footer">
-        <button class="btn" onclick="newDoc()" style="flex:1">+ 新建</button>
+        <button class="btn" onclick="newDoc()">＋ 新建文档</button>
+        <button class="btn" onclick="newFolder()" style="flex:0 0 auto;padding:5px 10px;">📁＋</button>
       </div>
     </aside>
     <div class="editor-scroll" id="scroll">
@@ -138,6 +181,7 @@ header h1 { font-size: 15px; font-weight: 600; }
     <span id="docStatus">未保存</span>
   </div>
 </div>
+<div class="toast" id="toast"></div>
 
 <script>
 // ── 全局变量（提前声明避免 TDZ）──
@@ -150,6 +194,20 @@ let expandedFolders = {};
 
 // ── 认证 ──
 function esc(s) { return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+// ── 下拉菜单 ──
+function toggleDropdown(e) { e.stopPropagation(); document.getElementById("ddMenu").classList.toggle("show"); }
+function closeDropdown() { document.getElementById("ddMenu").classList.remove("show"); }
+document.addEventListener("click", closeDropdown);
+
+// ── Toast ──
+function toast(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => el.classList.remove("show"), 2000);
+}
 
 async function doLogin() {
   const pw = document.getElementById("passwordInput").value;
@@ -172,9 +230,9 @@ async function showApp() {
   document.getElementById("loginPage").style.display = "none";
   document.getElementById("mainApp").style.display = "flex";
   const t = document.documentElement.getAttribute("data-theme") || "light";
-  document.getElementById("themeToggle").textContent = t === "light" ? "🌙" : "☀️";
+  const icon = document.getElementById("themeIcon");
+  if (icon) icon.textContent = t === "light" ? "🌙" : "☀️";
   await loadDocList();
-  // 如果有文档，打开第一个
   if (docs.length > 0) await openDoc(docs[0].id);
   else newDoc();
 }
@@ -189,13 +247,71 @@ async function loadDocList() {
 
 function renderDocList() {
   const el = document.getElementById("docList");
-  if (!docs.length) { el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:12px;">暂无文档</div>'; return; }
-  el.innerHTML = docs.map(d => `
-    <div class="doc-item ${currentDocId === d.id ? "active" : ""}" onclick="openDoc(${d.id})">
-      <span class="doc-del" onclick="event.stopPropagation();delDoc(${d.id})">🗑️</span>
-      <div class="doc-title">${esc(d.title || "无标题")}</div>
-      <div class="doc-time">${(d.updated_at || "").slice(0,16)}</div>
-    </div>`).join("");
+  if (!docs.length) { el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:12px;">暂无文档，点击下方新建</div>'; return; }
+
+  // 按文件夹分组
+  const folders = {};
+  docs.forEach(d => {
+    const f = d.folder || "默认";
+    if (!folders[f]) folders[f] = [];
+    folders[f].push(d);
+  });
+
+  let html = "";
+  Object.keys(folders).sort().forEach(folder => {
+    const items = folders[folder];
+    const collapsed = expandedFolders[folder] === false;
+    html += `<div class="folder-group">
+      <div class="folder-header ${collapsed ? "collapsed" : ""}" onclick="toggleFolder('${esc(folder)}')">
+        <span class="folder-arrow">▼</span>
+        <span class="folder-name">${esc(folder)}</span>
+        <span class="folder-count">${items.length}</span>
+      </div>
+      <div class="folder-items ${collapsed ? "collapsed" : ""}">
+        ${items.map(d => `
+          <div class="doc-item ${currentDocId === d.id ? "active" : ""} ${d._flash ? "flash" : ""}" onclick="openDoc(${d.id})">
+            <span class="doc-del" onclick="event.stopPropagation();delDoc(${d.id})">🗑️</span>
+            <div class="doc-title">${esc(d.title || "无标题")}</div>
+            <div class="doc-time">${(d.updated_at || "").slice(5,16)}</div>
+          </div>`).join("")}
+      </div>
+    </div>`;
+    // 清除 flash 标记
+    items.forEach(d => delete d._flash);
+  });
+  el.innerHTML = html;
+}
+
+function toggleFolder(name) {
+  if (expandedFolders[name] === false) delete expandedFolders[name];
+  else expandedFolders[name] = false;
+  renderDocList();
+}
+
+function newFolder() {
+  const name = prompt("文件夹名称：");
+  if (!name) return;
+  // 创建一个空文档到新文件夹，然后立即删除文档（只留文件夹）
+  // 更好的方式：直接在前端记录空文件夹
+  toast("文件夹「" + name + "」已创建，新建文档时可选此文件夹");
+  expandedFolders[name] = true;
+  // 如果没有文档，显示空文件夹
+  if (docs.length === 0) {
+    docs = [];
+    renderDocList();
+    // 手动插入空文件夹显示
+    const el = document.getElementById("docList");
+    el.innerHTML = `<div class="folder-group">
+      <div class="folder-header" onclick="toggleFolder('${esc(name)}')">
+        <span class="folder-arrow">▼</span>
+        <span class="folder-name">${esc(name)}</span>
+        <span class="folder-count">0</span>
+      </div>
+      <div class="folder-items">
+        <div style="color:var(--muted);font-size:12px;padding:8px 12px 8px 28px;">空文件夹</div>
+      </div>
+    </div>`;
+  }
 }
 
 async function openDoc(id) {
@@ -217,20 +333,31 @@ async function newDoc() {
   initLines("");
   renderAll();
   renderDocList();
-  document.getElementById("docStatus").textContent = "新文档";
+  document.getElementById("docStatus").textContent = "新文档（未保存）";
+  toast("新文档已创建，开始输入吧");
+  // 自动聚焦第一行
+  setTimeout(() => { if (editor.children[0]) editor.children[0].focus(); }, 100);
 }
 
 async function saveDoc() {
   const text = lines.map(l => l.text).join("\n");
   const title = lines.find(l => /^#\s/.test(l.text.trim()))?.text?.replace(/^#\s+/, "")?.trim() || text.split("\n")[0]?.slice(0, 50) || "无标题";
+  // 获取当前文档的文件夹
+  const curDoc = docs.find(d => d.id === currentDocId);
+  const folder = curDoc?.folder || "默认";
   if (currentDocId) {
     await api("PUT", "/docs/" + currentDocId, { title, content: text });
   } else {
-    const r = await api("POST", "/docs", { title, content: text });
+    const r = await api("POST", "/docs", { title, content: text, folder });
     if (r.success) currentDocId = r.data.id;
   }
   await loadDocList();
+  // 标记当前文档闪烁
+  const d = docs.find(x => x.id === currentDocId);
+  if (d) d._flash = true;
+  renderDocList();
   document.getElementById("docStatus").textContent = "已保存 " + new Date().toLocaleTimeString();
+  toast("已保存");
 }
 
 async function saveDocSilent() {
@@ -302,9 +429,10 @@ function toggleTheme() {
   const next = cur === "light" ? "dark" : "light";
   document.documentElement.setAttribute("data-theme", next);
   localStorage.setItem("md_theme", next);
-  document.getElementById("themeToggle").textContent = next === "light" ? "🌙" : "☀️";
+  const icon = document.getElementById("themeIcon");
+  if (icon) icon.textContent = next === "light" ? "🌙" : "☀️";
 }
-(function(){ const t = localStorage.getItem("md_theme") || "light"; document.documentElement.setAttribute("data-theme", t); document.addEventListener("DOMContentLoaded", () => { document.getElementById("themeToggle").textContent = t === "light" ? "🌙" : "☀️"; }); })();
+(function(){ const t = localStorage.getItem("md_theme") || "light"; document.documentElement.setAttribute("data-theme", t); document.addEventListener("DOMContentLoaded", () => { const icon = document.getElementById("themeIcon"); if (icon) icon.textContent = t === "light" ? "🌙" : "☀️"; }); })();
 
 // ── Markdown 单行渲染 ──
 function renderLine(text, inCodeBlock) {
