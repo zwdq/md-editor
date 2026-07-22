@@ -413,17 +413,18 @@ async function uploadFile(event) {
     return;
   }
 
-  // 多个 .md 文件批量导入
-  let imported = 0;
+  // 多个 .md 文件批量导入（一次性提交）
+  const batch = [];
   for (const file of files) {
     const text = await file.text();
     const title = file.name.replace(/\.md$|\.txt$|\.markdown$/, "");
-    const r = await api("POST", "/docs", { title, content: text, folder: "导入" });
-    if (r.success) imported++;
+    batch.push({ title, content: text, folder: "导入" });
   }
+  const r = await api("POST", "/docs/import", batch);
+  const imported = r.imported || 0;
   toast("导入成功：" + imported + " 篇");
   await loadDocList();
-  // 打开最后一个
+  // 打开最新的一条
   if (docs.length > 0) await openDoc(docs[0].id);
   event.target.value = "";
 }

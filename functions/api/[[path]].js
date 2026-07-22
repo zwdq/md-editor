@@ -92,7 +92,7 @@ export async function onRequest(context) {
       for (const doc of body) {
         if (!doc.content) continue;
         const title = doc.title || doc.content.split("\n")[0].replace(/^#+\s*/, "").slice(0, 50) || "无标题";
-        const folder = doc.folder || "默认";
+        const folder = doc.folder || "导入";
         await env.DB.prepare("INSERT INTO documents (title, content, folder) VALUES (?, ?, ?)").bind(title, doc.content, folder).run();
         imported++;
       }
