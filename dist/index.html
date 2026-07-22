@@ -167,9 +167,20 @@ function createLineEl(i) {
     onLineFocus(i);
   });
 
-  // blur: 渲染
+  // input: 实时保存源码到内存
+  div.addEventListener("input", function() {
+    if (div.classList.contains("editing")) {
+      lines[i].text = div.textContent;
+    }
+  });
+
+  // blur: 兜底渲染
   div.addEventListener("blur", function() {
-    onLineBlur(i);
+    if (activeLine === i) {
+      commitLine(i);
+      activeLine = -1;
+      saveContent();
+    }
   });
 
   return div;
@@ -205,12 +216,12 @@ function onLineFocus(i) {
   sel.addRange(range);
 }
 
-// ── 提交行：换成渲染 ──
+// ── 提交行：换成渲染（从内存读源码）──
 function commitLine(i) {
   const div = editor.children[i];
   if (!div) return;
-  const text = div.textContent;
-  lines[i].text = text;
+  // 从内存读取（input 事件已实时保存）
+  const text = lines[i].text;
   lines[i].html = renderLine(text);
   div.classList.remove("editing");
   div.classList.toggle("empty", text.trim() === "");
