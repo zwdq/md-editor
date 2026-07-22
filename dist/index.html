@@ -60,9 +60,10 @@ header h1 { font-size: 15px; font-weight: 600; }
 .line .checkbox { list-style: none; margin-left: -1.2em; }
 .line .checkbox input { margin-right: 6px; }
 .line.editing { font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; font-size: 14px; white-space: pre-wrap; word-break: break-word; }
-.line.code-line { font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; font-size: 14px; color: var(--text); }
-.line.code-line code-line { display: block; white-space: pre-wrap; }
-.line:has(+ .code-line).code-line, .line.code-line:has(+ .code-line) { } /* 连续代码行 */
+.line.code-line { font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; font-size: 14px; color: var(--text); background: var(--code-bg); border-radius: 0; white-space: pre-wrap; word-break: break-word; }
+.line.code-line:first-of-type, .line.code-line:not(.code-line) + .code-line { } 
+.line .code-fence { display: inline-block; font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--accent); background: var(--accent-soft); padding: 2px 10px; border-radius: 4px; font-weight: 600; }
+.line.code-fence-row { background: var(--code-bg); border-radius: 8px 8px 0 0; padding-top: 8px; }
 
 .statusbar { height: 28px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--muted); background: var(--card); border-top: 1px solid var(--border); flex-shrink: 0; }
 .layout { display: flex; flex-direction: column; height: 100vh; }
@@ -111,7 +112,7 @@ function toggleTheme() {
 function renderLine(text, inCodeBlock) {
   // 代码块内：原样显示
   if (inCodeBlock) {
-    return `<code-line>${text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</code-line>`;
+    return text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   }
   let html = text;
   if (!html.trim()) return "";
@@ -119,8 +120,12 @@ function renderLine(text, inCodeBlock) {
   // 行内代码先提取
   const codes = [];
   html = html.replace(/`([^`]+)`/g, (m, c) => { codes.push(c); return `\x00${codes.length-1}\x00`; });
-  // 代码块标记行
-  if (/^```/.test(html.trim())) return "```CODE_FENCE```";
+  // 代码块标记行：```lang 或 ```
+  const fenceMatch = html.trim().match(/^```(\w*)$/);
+  if (fenceMatch) {
+    const lang = fenceMatch[1];
+    return lang ? `<div class="code-fence" data-lang="${lang}">${lang}</div>` : `<div class="code-fence">code</div>`;
+  }
   // 标题
   if (/^######\s/.test(html)) html = `<h6>${html.replace(/^######\s+/, "")}</h6>`;
   else if (/^#####\s/.test(html)) html = `<h5>${html.replace(/^#####\s+/, "")}</h5>`;
@@ -159,13 +164,12 @@ function renderLine(text, inCodeBlock) {
 // ── 初始化行（标记代码块）──
 function initLines(text) {
   lines = text.split("\n").map(t => ({ text: t, html: "", inCode: false }));
-  // 扫描代码块
   let inCode = false;
   for (let i = 0; i < lines.length; i++) {
-    const isFence = /^```/.test(lines[i].text.trim());
+    const isFence = /^```\w*$/.test(lines[i].text.trim());
     if (isFence) {
-      lines[i].inCode = false; // 标记行本身不在代码块内
-      lines[i].html = "```CODE_FENCE```";
+      lines[i].inCode = false;
+      lines[i].html = renderLine(lines[i].text, false);
       inCode = !inCode;
     } else {
       lines[i].inCode = inCode;
@@ -254,19 +258,17 @@ function commitLine(i) {
 
 // 重新计算从第 i 行开始的代码块状态
 function recomputeCodeBlocks(fromLine) {
-  // 找到上一个代码块标记，确定起始状态
   let inCode = false;
   for (let j = 0; j <= fromLine && j < lines.length; j++) {
-    if (/^```/.test(lines[j].text.trim())) {
+    if (/^```\w*$/.test(lines[j].text.trim())) {
       inCode = !inCode;
     }
   }
-  // fromLine 本身
   for (let i = fromLine; i < lines.length; i++) {
-    const isFence = /^```/.test(lines[i].text.trim());
+    const isFence = /^```\w*$/.test(lines[i].text.trim());
     if (isFence) {
       lines[i].inCode = false;
-      lines[i].html = "```CODE_FENCE```";
+      lines[i].html = renderLine(lines[i].text, false);
       inCode = !inCode;
     } else {
       lines[i].inCode = inCode;
