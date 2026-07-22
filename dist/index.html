@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>✏️ Markdown 编辑器</title>
+<style>
+:root {
+  --bg: #1a1a1a; --bg-secondary: #252526; --card: #2a2a2a; --border: #3a3a3a;
+  --text: #e0e0e0; --muted: #888; --accent: #30CF79; --accent-soft: rgba(48,207,121,.12);
+  --code-bg: #1e1e1e; --preview-bg: #1a1a1a;
+}
+[data-theme="light"] {
+  --bg: #ffffff; --bg-secondary: #f7f8fa; --card: #ffffff; --border: #e4e6ef;
+  --text: #2c2c2c; --muted: #888; --accent: #30CF79; --accent-soft: rgba(48,207,121,.08);
+  --code-bg: #f5f5f5; --preview-bg: #ffffff;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; transition: background .25s, color .25s; }
+
+/* 顶栏 */
+header { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; background: var(--card); border-bottom: 1px solid var(--border); height: 52px; }
+header h1 { font-size: 16px; font-weight: 600; white-space: nowrap; }
+.header-left { display: flex; align-items: center; gap: 12px; }
+.header-right { display: flex; align-items: center; gap: 6px; }
+.btn { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text); cursor: pointer; font-size: 13px; transition: .15s; white-space: nowrap; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.icon { padding: 6px 10px; font-size: 16px; }
+
+/* 模式切换 */
+.mode-switch { display: flex; gap: 2px; background: var(--bg-secondary); border-radius: 8px; padding: 2px; border: 1px solid var(--border); }
+.mode-switch button { padding: 5px 14px; border-radius: 6px; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 13px; transition: .15s; }
+.mode-switch button.active { background: var(--accent); color: #fff; }
+
+/* 主体 */
+.main { display: flex; height: calc(100vh - 52px); }
+.pane { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+.divider { width: 1px; background: var(--border); cursor: col-resize; flex-shrink: 0; position: relative; }
+.divider::after { content: ""; position: absolute; left: -3px; right: -3px; top: 0; bottom: 0; }
+
+/* 编辑器 */
+.editor-pane textarea {
+  width: 100%; height: 100%; border: 0; resize: none; padding: 24px 32px;
+  background: var(--bg); color: var(--text); font-family: "JetBrains Mono", "SF Mono", Menlo, monospace;
+  font-size: 15px; line-height: 1.8; outline: none; tab-size: 2;
+}
+.editor-pane textarea::placeholder { color: var(--muted); }
+
+/* 预览 */
+.preview-pane { overflow-y: auto; background: var(--preview-bg); }
+.preview-content { padding: 24px 32px; max-width: 760px; margin: 0 auto; }
+
+/* Typora 风格 markdown 渲染 */
+.preview-content { font-size: 16px; line-height: 1.8; color: var(--text); }
+.preview-content h1, .preview-content h2, .preview-content h3, .preview-content h4, .preview-content h5, .preview-content h6 { margin-top: 1.4em; margin-bottom: 0.6em; font-weight: 700; line-height: 1.3; }
+.preview-content h1 { font-size: 1.9em; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; }
+.preview-content h2 { font-size: 1.5em; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; }
+.preview-content h3 { font-size: 1.25em; }
+.preview-content h4 { font-size: 1.05em; }
+.preview-content p { margin: 0.8em 0; }
+.preview-content a { color: var(--accent); text-decoration: none; }
+.preview-content a:hover { text-decoration: underline; }
+.preview-content strong { font-weight: 700; }
+.preview-content em { font-style: italic; }
+.preview-content del { color: var(--muted); }
+.preview-content code { font-family: "JetBrains Mono", monospace; font-size: 0.88em; background: var(--code-bg); padding: 2px 6px; border-radius: 4px; }
+.preview-content pre { background: var(--code-bg); border-radius: 8px; padding: 16px; overflow-x: auto; margin: 1em 0; border: 1px solid var(--border); }
+.preview-content pre code { background: transparent; padding: 0; font-size: 14px; line-height: 1.6; }
+.preview-content blockquote { border-left: 4px solid var(--accent); padding: 4px 16px; margin: 1em 0; color: var(--muted); background: var(--accent-soft); border-radius: 0 8px 8px 0; }
+.preview-content blockquote p { margin: 0.4em 0; }
+.preview-content ul, .preview-content ol { margin: 0.8em 0; padding-left: 2em; }
+.preview-content li { margin: 0.3em 0; }
+.preview-content img { max-width: 100%; border-radius: 8px; margin: 1em 0; }
+.preview-content table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+.preview-content th, .preview-content td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; }
+.preview-content th { background: var(--bg-secondary); font-weight: 700; }
+.preview-content hr { border: 0; border-top: 1px solid var(--border); margin: 1.5em 0; }
+.preview-content .checkbox { list-style: none; }
+.preview-content .checkbox input { margin-right: 6px; }
+
+/* 隐藏控制 */
+.editor-only .preview-pane { display: none; }
+.preview-only .editor-pane { display: none; }
+.preview-only .divider { display: none; }
+.split .editor-pane { flex: 1; }
+.split .preview-pane { flex: 1; }
+
+/* 底部状态栏 */
+.statusbar { position: fixed; bottom: 0; right: 0; padding: 4px 12px; font-size: 11px; color: var(--muted); background: var(--card); border-top: 1px solid var(--border); border-left: 1px solid var(--border); border-radius: 8px 0 0 0; z-index: 10; }
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .main { flex-direction: column; }
+  .divider { width: 100%; height: 1px; cursor: row-resize; }
+  .split .editor-pane, .split .preview-pane { flex: none; height: 50%; }
+  .editor-pane textarea { padding: 16px; font-size: 14px; }
+  .preview-content { padding: 16px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>✏️ Markdown</h1>
+    <div class="mode-switch">
+      <button onclick="setMode('editor')" id="modeEditor">编辑</button>
+      <button onclick="setMode('split')" id="modeSplit" class="active">分屏</button>
+      <button onclick="setMode('preview')" id="modePreview">预览</button>
+    </div>
+  </div>
+  <div class="header-right">
+    <button class="btn" onclick="insertTemplate()">模板</button>
+    <button class="btn" onclick="downloadMD()">下载</button>
+    <button class="btn" onclick="document.getElementById('uploadFile').click()">打开</button>
+    <input type="file" id="uploadFile" accept=".md,.txt,.markdown" style="display:none" onchange="uploadFile(event)">
+    <button class="btn" onclick="copyHTML()">复制HTML</button>
+    <button class="btn icon" id="themeToggle" onclick="toggleTheme()">🌙</button>
+  </div>
+</header>
+
+<div class="main" id="main">
+  <div class="pane editor-pane">
+    <textarea id="editor" placeholder="开始编写 Markdown…" oninput="render()" spellcheck="false"></textarea>
+  </div>
+  <div class="divider" id="divider"></div>
+  <div class="pane preview-pane">
+    <div class="preview-content" id="preview"></div>
+  </div>
+</div>
+
+<div class="statusbar" id="statusbar">0 字</div>
+
+<script>
+// ── 主题 ──
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute("data-theme") || "light";
+  const next = cur === "light" ? "dark" : "light";
+  document.documentElement.setAttribute("data-theme", next);
+  localStorage.setItem("md_theme", next);
+  document.getElementById("themeToggle").textContent = next === "light" ? "🌙" : "☀️";
+}
+(function(){ const t = localStorage.getItem("md_theme") || "light"; document.documentElement.setAttribute("data-theme", t); document.addEventListener("DOMContentLoaded", () => { document.getElementById("themeToggle").textContent = t === "light" ? "🌙" : "☀️"; }); })();
+
+// ── 模式 ──
+function setMode(mode) {
+  const main = document.getElementById("main");
+  main.className = "";
+  if (mode === "editor") main.classList.add("editor-only");
+  else if (mode === "preview") main.classList.add("preview-only");
+  else main.classList.add("split");
+  document.querySelectorAll(".mode-switch button").forEach(b => b.classList.remove("active"));
+  document.getElementById("mode" + mode.charAt(0).toUpperCase() + mode.slice(1)).classList.add("active");
+  localStorage.setItem("md_mode", mode);
+}
+(function(){ const m = localStorage.getItem("md_mode") || "split"; document.addEventListener("DOMContentLoaded", () => setMode(m)); })();
+
+// ── Markdown 渲染器 ──
+function md2html(md) {
+  let html = md;
+
+  // 转义 HTML
+  html = html.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  // 代码块（```lang ... ```）
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (m, lang, code) => {
+    return `<pre><code class="lang-${lang}">${code.trim()}</code></pre>`;
+  });
+
+  // 行内代码
+  html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
+
+  // 标题
+  html = html.replace(/^######\s+(.+)$/gm, "<h6>$1</h6>");
+  html = html.replace(/^#####\s+(.+)$/gm, "<h5>$1</h5>");
+  html = html.replace(/^####\s+(.+)$/gm, "<h4>$1</h4>");
+  html = html.replace(/^###\s+(.+)$/gm, "<h3>$1</h3>");
+  html = html.replace(/^##\s+(.+)$/gm, "<h2>$1</h2>");
+  html = html.replace(/^#\s+(.+)$/gm, "<h1>$1</h1>");
+
+  // 水平线
+  html = html.replace(/^---+$/gm, "<hr>");
+
+  // 引用块
+  html = html.replace(/^&gt;\s?(.+)$/gm, "<blockquote>$1</blockquote>");
+  html = html.replace(/<\/blockquote>\n<blockquote>/g, "\n");
+
+  // 表格
+  html = html.replace(/^\|(.+)\|\n\|([-:\s|]+)\|\n((?:\|.+\|\n?)+)/gm, (m, header, sep, rows) => {
+    const heads = header.split("|").map(s => s.trim()).filter(Boolean);
+    const ths = heads.map(h => `<th>${h}</th>`).join("");
+    const trs = rows.trim().split("\n").map(row => {
+      const cells = row.split("|").map(s => s.trim()).filter(Boolean);
+      return "<tr>" + cells.map(c => `<td>${c}</td>`).join("") + "</tr>";
+    }).join("");
+    return `<table><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>`;
+  });
+
+  // 任务列表
+  html = html.replace(/^-\s\[(x|X|\s)\]\s(.+)$/gm, (m, check, text) => {
+    const checked = check.match(/[xX]/) ? "checked" : "";
+    return `<li class="checkbox"><input type="checkbox" ${checked} disabled> ${text}</li>`;
+  });
+
+  // 无序列表
+  html = html.replace(/^[-*+]\s+(.+)$/gm, "<li>$1</li>");
+  html = html.replace(/(<li>.*<\/li>\n?)+/g, m => "<ul>" + m + "</ul>");
+  html = html.replace(/<\/ul>\n<ul>/g, "");
+
+  // 有序列表
+  html = html.replace(/^\d+\.\s+(.+)$/gm, "<li>$1</li>");
+
+  // 粗体、斜体、删除线
+  html = html.replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>");
+  html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  html = html.replace(/__(.+?)__/g, "<strong>$1</strong>");
+  html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
+  html = html.replace(/_(.+?)_/g, "<em>$1</em>");
+  html = html.replace(/~~(.+?)~~/g, "<del>$1</del>");
+
+  // 链接和图片
+  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+
+  // 段落（把连续非标签行包成 p）
+  html = html.split("\n\n").map(block => {
+    block = block.trim();
+    if (!block) return "";
+    if (/^<(h[1-6]|ul|ol|pre|blockquote|table|hr|img|li)/.test(block)) return block;
+    if (/^<li>/.test(block)) return "<ul>" + block + "</ul>";
+    return "<p>" + block.replace(/\n/g, "<br>") + "</p>";
+  }).join("\n");
+
+  return html;
+}
+
+// ── 渲染 ──
+function render() {
+  const md = document.getElementById("editor").value;
+  document.getElementById("preview").innerHTML = md2html(md);
+  document.getElementById("statusbar").textContent = md.length + " 字";
+  // 自动保存
+  clearTimeout(window._saveTimer);
+  window._saveTimer = setTimeout(() => localStorage.setItem("md_content", md), 500);
+}
+
+// ── 同步滚动 ──
+const editor = document.getElementById("editor");
+const preview = document.querySelector(".preview-pane");
+editor.addEventListener("scroll", () => {
+  if (document.getElementById("main").classList.contains("split")) {
+    const ratio = editor.scrollTop / (editor.scrollHeight - editor.clientHeight || 1);
+    preview.scrollTop = ratio * (preview.scrollHeight - preview.clientHeight || 1);
+  }
+});
+
+// ── 分隔条拖拽 ──
+(function() {
+  const divider = document.getElementById("divider");
+  let dragging = false;
+  divider.addEventListener("mousedown", () => { dragging = true; document.body.style.cursor = "col-resize"; });
+  document.addEventListener("mouseup", () => { dragging = false; document.body.style.cursor = ""; });
+  document.addEventListener("mousemove", e => {
+    if (!dragging) return;
+    const main = document.getElementById("main");
+    const rect = main.getBoundingClientRect();
+    const ratio = (e.clientX - rect.left) / rect.width;
+    if (ratio > 0.15 && ratio < 0.85) {
+      main.style.gridTemplateColumns = "";
+      const panes = main.querySelectorAll(".pane");
+      if (panes.length === 2) {
+        panes[0].style.flex = ratio;
+        panes[1].style.flex = 1 - ratio;
+      }
+    }
+  });
+})();
+
+// ── Tab 缩进 ──
+editor.addEventListener("keydown", e => {
+  if (e.key === "Tab") {
+    e.preventDefault();
+    const start = editor.selectionStart;
+    editor.setRangeText("  ", start, start, "end");
+  }
+});
+
+// ── 文件操作 ──
+function downloadMD() {
+  const content = editor.value;
+  const blob = new Blob([content], { type: "text/markdown" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "document-" + new Date().toISOString().slice(0,10) + ".md";
+  a.click();
+}
+
+function uploadFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  file.text().then(text => { editor.value = text; render(); });
+  event.target.value = "";
+}
+
+function copyHTML() {
+  const html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><style>body{font-family:sans-serif;max-width:760px;margin:40px auto;padding:0 20px;line-height:1.8;}pre{background:#f5f5f5;padding:16px;border-radius:8px;overflow-x:auto;}code{background:#f5f5f5;padding:2px 6px;border-radius:4px;}blockquote{border-left:4px solid #30CF79;padding-left:16px;color:#666;margin-left:0;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #ddd;padding:8px 12px;}img{max-width:100%;}</style></head><body>" + document.getElementById("preview").innerHTML + "</body></html>";
+  navigator.clipboard.writeText(html).then(() => alert("HTML 已复制到剪贴板"));
+}
+
+function insertTemplate() {
+  editor.value = `# 标题
+
+这是一段**粗体**和*斜体*文字。
+
+## 列表
+
+- 无序项目一
+- 无序项目二
+  - 子项目
+
+1. 有序项目一
+2. 有序项目二
+
+## 任务
+
+- [x] 已完成
+- [ ] 未完成
+
+## 代码
+
+\`\`\`python
+def hello():
+    print("Hello, World!")
+\`\`\`
+
+行内代码 \`code\`
+
+## 引用
+
+> 这是一段引用文字
+
+## 表格
+
+| 名称 | 描述 |
+|------|------|
+| A    | 描述A |
+| B    | 描述B |
+
+## 链接
+
+[链接文字](https://example.com)
+
+![图片](https://via.placeholder.com/400x200)
+
+---
+
+<del>删除线</del>`;
+  render();
+}
+
+// ── 初始化 ──
+editor.value = localStorage.getItem("md_content") || "";
+render();
+</script>
+</body>
+</html>
