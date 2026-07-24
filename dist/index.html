@@ -215,19 +215,19 @@ header h1 { font-size: 15px; font-weight: 600; }
 
 <script>
 // ── 全局变量（提前声明避免 TDZ）──
-// mousedown 标记：用于区分点击 vs 拖选
-let _mouseDownIdx = -1;
+// 跟踪鼠标按下状态，区分点击 vs 拖选
+let _mouseDown = false;
+let _pendingFocusIdx = -1;
+document.addEventListener("mousedown", () => { _mouseDown = true; });
 document.addEventListener("mouseup", () => {
-  // mouseup 时检查选区：有选区文本 = 拖选，无 = 点击
-  if (_mouseDownIdx >= 0) {
+  _mouseDown = false;
+  // mouseup 时检查：如果有 pendingFocus 且无选区，说明是纯点击
+  if (_pendingFocusIdx >= 0) {
     const sel = window.getSelection();
-    const hasSelection = sel && sel.toString().length > 0;
-    if (!hasSelection) {
-      // 纯点击：手动 focus 进入编辑
-      const div = editor.children[_mouseDownIdx];
-      if (div) focusLine(_mouseDownIdx, pendingCaret ? pendingCaret.offset : null);
+    if (!sel || sel.toString().length === 0) {
+      focusLine(_pendingFocusIdx, pendingCaret ? pendingCaret.offset : null);
     }
-    _mouseDownIdx = -1;
+    _pendingFocusIdx = -1;
   }
 });
 // SSO: 接收来自 Dashboard 的自动登录
@@ -762,15 +762,14 @@ function createLineEl(i) {
     if (offset !== null) pendingCaret = { index: idx, offset };
   });
 
-  // mousedown: 阻止自动 focus（不阻止选区），mouseup 时再决定是否进入编辑
-  div.addEventListener("mousedown", function(e) {
-    _mouseDownIdx = parseInt(this.dataset.index);
-    e.preventDefault();
-  });
-
-  // focus: 仅在外部调用 focusLine 时触发（如键盘导航、点击 mouseup）
+  // focus: 如果鼠标按着（拖选中），不进入编辑态
   div.addEventListener("focus", function() {
     const idx = parseInt(this.dataset.index);
+    if (_mouseDown) {
+      // 拖选模式：标记等 mouseup 处理
+      _pendingFocusIdx = idx;
+      return;
+    }
     const fallbackOffset = lines[idx] && lines[idx].inCode ? getCaretOffset(this) : null;
     onLineFocus(idx, consumePendingCaret(idx, fallbackOffset));
   });
