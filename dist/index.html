@@ -30,7 +30,7 @@ header h1 { font-size: 15px; font-weight: 600; }
 .editor-area { max-width: 760px; margin: 0 auto; padding: 32px 32px 120px; outline: none; min-height: 100%; }
 .editor-area:focus { outline: none; }
 
-.line { position: relative; min-height: 1.8em; padding: 1px 8px; margin: 0 -8px; border-radius: 4px; transition: background .08s; font-size: 16px; line-height: 1.8; caret-color: var(--accent); }
+.line { position: relative; min-height: 1.8em; padding: 1px 8px; margin: 0 -8px; border-radius: 4px; transition: background .08s; font-size: 16px; line-height: 1.8; caret-color: var(--accent); user-select: text; -webkit-user-select: text; }
 .line:hover { background: var(--accent-soft); }
 .line:focus { outline: none; background: var(--bg-secondary); }
 .line.empty::before { content: ""; }
@@ -215,6 +215,17 @@ header h1 { font-size: 15px; font-weight: 600; }
 
 <script>
 // ── 全局变量（提前声明避免 TDZ）──
+let _dragSuppressFocus = false;
+let _selStartIdx = -1;
+document.addEventListener("pointerup", (e) => {
+  // 如果是点击（非拖选），手动 focus 目标行
+  if (_selStartIdx >= 0 && !_dragSuppressFocus) {
+    const div = editor.children[_selStartIdx];
+    if (div) focusLine(_selStartIdx, pendingCaret ? pendingCaret.offset : null);
+  }
+  _selStartIdx = -1;
+  setTimeout(() => { _dragSuppressFocus = false; }, 50);
+});
 // SSO: 接收来自 Dashboard 的自动登录
 window.addEventListener("message", async (e) => {
   if (e.data && e.data.type === "vault-sso" && e.data.password) {
@@ -736,21 +747,40 @@ function createLineEl(i) {
   div.className = lineClassName(i);
   div.dataset.index = i;
   div.dataset.inCode = lines[i].inCode ? "1" : "0";
-  div.contentEditable = "true";
+  div.contentEditable = "false";
+  div.tabIndex = 0;
   div.spellcheck = false;
   div.innerHTML = lines[i].html || "";
 
   div.addEventListener("pointerdown", function(e) {
     const idx = parseInt(this.dataset.index);
+    _selStartIdx = idx;
+    _dragSuppressFocus = false;
     const offset = getPointCaretOffset(this, e.clientX, e.clientY);
     if (offset !== null) pendingCaret = { index: idx, offset };
   });
 
-  // focus: 显示源码（从 dataset 动态读索引，不用闭包）
+  // 拖选时标记
+  div.addEventListener("pointermove", function(e) {
+    if (_selStartIdx >= 0 && e.buttons > 0) {
+      _dragSuppressFocus = true;
+    }
+  });
+
+  // focus: 延迟进入编辑态，区分点击 vs 拖选
   div.addEventListener("focus", function() {
     const idx = parseInt(this.dataset.index);
-    const fallbackOffset = lines[idx] && lines[idx].inCode ? getCaretOffset(this) : null;
-    onLineFocus(idx, consumePendingCaret(idx, fallbackOffset));
+    const el = this;
+    // 延迟检查，看是否在拖选
+    setTimeout(() => {
+      if (_dragSuppressFocus) {
+        // 拖选模式：blur 掉，保持非可编辑以便跨行选中
+        el.blur();
+        return;
+      }
+      const fallbackOffset = lines[idx] && lines[idx].inCode ? getCaretOffset(el) : null;
+      onLineFocus(idx, consumePendingCaret(idx, fallbackOffset));
+    }, 0);
   });
 
   // input: 实时保存源码到内存
@@ -844,7 +874,7 @@ function setCaretOffset(el, offset) {
 function focusLine(index, offset = null) {
   pendingCaret = { index, offset };
   const div = editor.children[index];
-  if (div) div.focus();
+  if (div) { div.contentEditable = "true"; div.focus(); }
 }
 
 function ensureEditablePlaceholder(el) {
@@ -861,6 +891,7 @@ function onLineFocus(i, caretOffset = null) {
   activeLine = i;
   const div = editor.children[i];
   if (!div) return;
+  div.contentEditable = "true";
   div.classList.add("editing");
   // 显示源码（清除零宽空格等占位符）
   div.textContent = lines[i].text || "";
@@ -879,6 +910,7 @@ function commitLine(i) {
   if (!div) return;
   // 全量重新计算代码块状态和 HTML
   recomputeAllCodeBlocks();
+  div.contentEditable = "false";
   div.classList.remove("editing");
   refreshLineElement(i);
   // 更新所有行的 className 和 innerHTML（代码块状态可能变了）
@@ -923,6 +955,7 @@ editor.addEventListener("keydown", (e) => {
     recomputeAllCodeBlocks();
     // 更新当前行 DOM
     target.classList.remove("editing");
+    target.contentEditable = "false";
     refreshLineElement(i);
     // 更新后续行 DOM
     // 创建新行 DOM
