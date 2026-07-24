@@ -65,6 +65,10 @@ header h1 { font-size: 15px; font-weight: 600; }
 .line.code-line:first-of-type, .line.code-line:not(.code-line) + .code-line { } 
 .line .code-fence { display: inline-block; font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--accent); background: var(--accent-soft); padding: 2px 10px; border-radius: 4px; font-weight: 600; }
 .line.code-fence-row { background: var(--code-bg); border-radius: 8px 8px 0 0; padding-top: 8px; }
+.code-fence-wrap { display: flex; align-items: center; justify-content: space-between; }
+.code-copy-btn { font-family: -apple-system, sans-serif; font-size: 11px; color: var(--muted); background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; cursor: pointer; opacity: 0; transition: .15s; }
+.line.code-fence-row:hover .code-copy-btn { opacity: .8; }
+.code-copy-btn:hover { opacity: 1 !important; color: var(--accent); border-color: var(--accent); }
 
 .statusbar { height: 28px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--muted); background: var(--card); border-top: 1px solid var(--border); flex-shrink: 0; }
 .layout { display: flex; flex-direction: column; height: 100vh; }
@@ -604,7 +608,8 @@ function renderLine(text, inCodeBlock) {
   // 代码块标记行：```lang 或 ```
   const lang = getFenceLang(html);
   if (lang !== null) {
-    return lang ? `<div class="code-fence" data-lang="${lang}">${lang}</div>` : `<div class="code-fence">code</div>`;
+    const label = lang || "code";
+    return `<div class="code-fence-wrap"><div class="code-fence" data-lang="${label}">${label}</div><button class="code-copy-btn" onclick="copyCodeBlock(this)" onmousedown="event.preventDefault()">复制代码</button></div>`;
   }
   // 标题
   if (/^######\s/.test(html)) html = `<h6>${html.replace(/^######\s+/, "")}</h6>`;
@@ -639,6 +644,35 @@ function renderLine(text, inCodeBlock) {
   html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
   return html;
+}
+
+// ── 复制代码块 ──
+function copyCodeBlock(btn) {
+  // 找到按钮所在的 fence 行（.line 元素）
+  const lineEl = btn.closest(".line");
+  if (!lineEl) return;
+  const startIdx = parseInt(lineEl.dataset.index);
+  // 从 startIdx+1 开始收集代码行，直到遇到下一个 fence 行
+  const codeLines = [];
+  for (let i = startIdx + 1; i < lines.length; i++) {
+    if (isFenceLine(lines[i].text)) break;
+    codeLines.push(lines[i].text);
+  }
+  const text = codeLines.join("\n");
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = "✓ 已复制";
+    setTimeout(() => { btn.textContent = "复制代码"; }, 1500);
+  }).catch(() => {
+    // 兜底：用 textarea
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    btn.textContent = "✓ 已复制";
+    setTimeout(() => { btn.textContent = "复制代码"; }, 1500);
+  });
 }
 
 function getFenceLang(text) {
