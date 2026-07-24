@@ -215,16 +215,20 @@ header h1 { font-size: 15px; font-weight: 600; }
 
 <script>
 // ── 全局变量（提前声明避免 TDZ）──
-let _dragSuppressFocus = false;
-let _selStartIdx = -1;
-document.addEventListener("pointerup", (e) => {
-  // 如果是点击（非拖选），手动 focus 目标行
-  if (_selStartIdx >= 0 && !_dragSuppressFocus) {
-    const div = editor.children[_selStartIdx];
-    if (div) focusLine(_selStartIdx, pendingCaret ? pendingCaret.offset : null);
+// mousedown 标记：用于区分点击 vs 拖选
+let _mouseDownIdx = -1;
+document.addEventListener("mouseup", () => {
+  // mouseup 时检查选区：有选区文本 = 拖选，无 = 点击
+  if (_mouseDownIdx >= 0) {
+    const sel = window.getSelection();
+    const hasSelection = sel && sel.toString().length > 0;
+    if (!hasSelection) {
+      // 纯点击：手动 focus 进入编辑
+      const div = editor.children[_mouseDownIdx];
+      if (div) focusLine(_mouseDownIdx, pendingCaret ? pendingCaret.offset : null);
+    }
+    _mouseDownIdx = -1;
   }
-  _selStartIdx = -1;
-  setTimeout(() => { _dragSuppressFocus = false; }, 50);
 });
 // SSO: 接收来自 Dashboard 的自动登录
 window.addEventListener("message", async (e) => {
@@ -754,33 +758,21 @@ function createLineEl(i) {
 
   div.addEventListener("pointerdown", function(e) {
     const idx = parseInt(this.dataset.index);
-    _selStartIdx = idx;
-    _dragSuppressFocus = false;
     const offset = getPointCaretOffset(this, e.clientX, e.clientY);
     if (offset !== null) pendingCaret = { index: idx, offset };
   });
 
-  // 拖选时标记
-  div.addEventListener("pointermove", function(e) {
-    if (_selStartIdx >= 0 && e.buttons > 0) {
-      _dragSuppressFocus = true;
-    }
+  // mousedown: 阻止自动 focus（不阻止选区），mouseup 时再决定是否进入编辑
+  div.addEventListener("mousedown", function(e) {
+    _mouseDownIdx = parseInt(this.dataset.index);
+    e.preventDefault();
   });
 
-  // focus: 延迟进入编辑态，区分点击 vs 拖选
+  // focus: 仅在外部调用 focusLine 时触发（如键盘导航、点击 mouseup）
   div.addEventListener("focus", function() {
     const idx = parseInt(this.dataset.index);
-    const el = this;
-    // 延迟检查，看是否在拖选
-    setTimeout(() => {
-      if (_dragSuppressFocus) {
-        // 拖选模式：blur 掉，保持非可编辑以便跨行选中
-        el.blur();
-        return;
-      }
-      const fallbackOffset = lines[idx] && lines[idx].inCode ? getCaretOffset(el) : null;
-      onLineFocus(idx, consumePendingCaret(idx, fallbackOffset));
-    }, 0);
+    const fallbackOffset = lines[idx] && lines[idx].inCode ? getCaretOffset(this) : null;
+    onLineFocus(idx, consumePendingCaret(idx, fallbackOffset));
   });
 
   // input: 实时保存源码到内存
